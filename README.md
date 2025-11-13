@@ -64,10 +64,10 @@ It allows students to post items they’ve *found* or *lost* within the campus, 
 ## 📸 Screenshots
 
 ### 🏠 Home Page
-![Home Page](Screenshots%202025-11-13%20165105.png)
+![Home Page](Screenshot%202025-11-13%20165105.png)
 
 ### 📝 Login Modal
-![Login Modal](Screenshots%202025-11-13%20165112.png)
+![Login Modal](Screenshot%202025-11-13%20165112.png)
 
 ### 📤 Post Item Modal
-![Post Item Modal](Screenshots%202025-11-13%20165526.png)
+![Post Item Modal](Screenshot%202025-11-13%20165526.png)
