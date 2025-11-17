@@ -66,7 +66,7 @@ It allows students to post items they’ve *found* or *lost* within the campus, 
 ### 🏠 Home Page
 ![Home Page](Screenshot%202025-11-13%20165105.png)
 
-### 📝 Login Modal
+### 📝 Login & Register Modal
 ![Login Modal](Screenshot%202025-11-13%20165112.png)
 
 ### 📤 Post Item Modal
