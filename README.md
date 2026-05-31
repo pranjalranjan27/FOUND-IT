@@ -16,7 +16,7 @@ It allows students to post items they’ve *found* or *lost* within the campus, 
   - Description
   - Category (e.g., mobile, laptop, ID card)
   - Place (where the item was found/lost)
-  - Hostel block
+  - Hostel blockS
   - Up to 3 images
 - Each post is displayed publicly for easy browsing.
 
