@@ -1,3 +1,10 @@
+/* ================================================================
+   Found IT — main.js
+   All existing behaviour preserved; new features layered on top.
+   ================================================================ */
+
+/* ── Auth helpers ─────────────────────────────────────────────── */
+
 function isLoggedIn() {
   return document.body.getAttribute("data-loggedin") === "1";
 }
@@ -26,6 +33,8 @@ document.getElementById("openLogin")?.addEventListener("click", () => {
   if (modalEl) new bootstrap.Modal(modalEl).show();
 });
 
+/* ── Post modal ───────────────────────────────────────────────── */
+
 function openPostModal(kind) {
   if (!requireLogin("You need to login first.")) return;
 
@@ -36,6 +45,10 @@ function openPostModal(kind) {
   if (!form || !title || !kindInput) return;
 
   form.reset();
+
+  // Clear image preview
+  const preview = document.getElementById("imagePreview");
+  if (preview) preview.innerHTML = "";
 
   const isFound = kind === "found";
   title.textContent = isFound ? "Post a FOUND item" : "Post a LOST item";
@@ -49,6 +62,8 @@ function openPostModal(kind) {
 }
 
 window.openPostModal = openPostModal;
+
+/* ── Delete countdown timers ──────────────────────────────────── */
 
 function setupCountdowns() {
   document.querySelectorAll("[data-delete-eta]").forEach((el) => {
@@ -66,12 +81,20 @@ function setupCountdowns() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", setupCountdowns);
-document.addEventListener("DOMContentLoaded", () => {
+/* ── Flash message auto-dismiss ───────────────────────────────── */
+
+function setupFlashAutoDismiss() {
   document.querySelectorAll(".alert-success").forEach((el) => {
-    setTimeout(() => el.remove(), 10000); // 10,000 ms = 10s
+    setTimeout(() => {
+      el.style.transition = "opacity .3s ease, transform .3s ease";
+      el.style.opacity = "0";
+      el.style.transform = "translateY(-8px)";
+      setTimeout(() => el.remove(), 300);
+    }, 8000);
   });
-});
+}
+
+/* ── File upload validation ───────────────────────────────────── */
 
 document.getElementById("postForm")?.addEventListener("submit", function (e) {
   const input = this.querySelector('input[type="file"][name="images"]');
@@ -93,9 +116,17 @@ document.getElementById("postForm")?.addEventListener("submit", function (e) {
       return;
     }
   }
+
+  // Show loading spinner
+  const btnText = document.querySelector("#postSubmitBtn .btn-text");
+  const spinner = document.getElementById("postSpinner");
+  if (btnText) btnText.textContent = "Posting…";
+  if (spinner) spinner.classList.remove("d-none");
 });
 
-document.addEventListener("DOMContentLoaded", () => {
+/* ── Filters modal ────────────────────────────────────────────── */
+
+function setupFilters() {
   const btn = document.getElementById("filtersBtn");
   const modalEl = document.getElementById("filtersModal");
   if (!btn || !modalEl) return;
@@ -126,4 +157,97 @@ document.addEventListener("DOMContentLoaded", () => {
     modal.hide();
     form?.submit();
   });
+}
+
+/* ── Relative timestamps ("3 h ago") ──────────────────────────── */
+
+function timeAgo(dateStr) {
+  const date = new Date(dateStr);
+  if (isNaN(date)) return dateStr;           // Fallback if unparseable
+
+  const now = new Date();
+  const seconds = Math.floor((now - date) / 1000);
+
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return minutes + " min ago";
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours + " h ago";
+  const days = Math.floor(hours / 24);
+  if (days < 7) return days + " d ago";
+  if (days < 30) return Math.floor(days / 7) + " w ago";
+  return date.toLocaleDateString("en-IN", {
+    month: "short", day: "numeric", year: "numeric"
+  });
+}
+
+function setupTimeago() {
+  document.querySelectorAll("time.timeago").forEach((el) => {
+    const raw = el.getAttribute("datetime");
+    if (raw) {
+      el.textContent = timeAgo(raw);
+      el.title = raw;            // Tooltip shows exact timestamp
+    }
+  });
+}
+
+/* ── Image preview before upload ──────────────────────────────── */
+
+function setupImagePreview() {
+  const input = document.getElementById("imageInput");
+  const preview = document.getElementById("imagePreview");
+  if (!input || !preview) return;
+
+  input.addEventListener("change", function () {
+    preview.innerHTML = "";
+    const files = Array.from(this.files).slice(0, 3);
+
+    files.forEach((file, idx) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const col = document.createElement("div");
+        col.className = "col-4 preview-thumb";
+        col.innerHTML =
+          `<img src="${e.target.result}" alt="Preview ${idx + 1}">` +
+          `<button type="button" class="remove-preview" data-idx="${idx}" title="Remove">&times;</button>`;
+        preview.appendChild(col);
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  // Remove individual preview (visual only — can't modify FileList)
+  preview.addEventListener("click", (e) => {
+    const btn = e.target.closest(".remove-preview");
+    if (btn) btn.closest(".preview-thumb").remove();
+  });
+}
+
+/* ── Lightbox (click thumbnail → full-size) ───────────────────── */
+
+function setupLightbox() {
+  const modalEl = document.getElementById("lightboxModal");
+  const modalImg = document.getElementById("lightboxImg");
+  if (!modalEl || !modalImg) return;
+
+  const modal = new bootstrap.Modal(modalEl);
+
+  document.addEventListener("click", (e) => {
+    const trigger = e.target.closest(".lightbox-trigger");
+    if (!trigger) return;
+    modalImg.src = trigger.src;
+    modalImg.alt = trigger.alt;
+    modal.show();
+  });
+}
+
+/* ── Bootstrap all features on DOM ready ──────────────────────── */
+
+document.addEventListener("DOMContentLoaded", () => {
+  setupCountdowns();
+  setupFlashAutoDismiss();
+  setupFilters();
+  setupTimeago();
+  setupImagePreview();
+  setupLightbox();
 });
