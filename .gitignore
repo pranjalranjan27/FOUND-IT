@@ -1,18 +1,35 @@
+# ── Python ────────────────────────
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
+# ── Virtual environments ─────────
 .venv/
-env/
 venv/
+env/
 
-instance/
+# ── Instance & database ──────────
+backend/instance/
 *.db
 
-.vscode/
+# ── Environment variables ────────
+.env
+.env.*
 
+# ── Uploads (user data) ──────────
+backend/uploads/
+
+# ── Editor / IDE ─────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS junk ──────────────────────
 .DS_Store
 Thumbs.db
 
-static/uploads/
+# ── Logs ─────────────────────────
+*.log
