@@ -1,7 +1,7 @@
 /* ================================================================
    Found IT — app.js
-   Fetch-based frontend.  Communicates with Flask REST API.
-   All rendering done in JavaScript — no Jinja dependency.
+   Fetch-based frontend for a community lost-and-found platform.
+   Communicates with Flask REST API. All rendering in JavaScript.
    ================================================================ */
 
 /* ── Centralized API helper ──────────────────────────────────────── */
@@ -24,6 +24,7 @@ const state = {
   user: null,
   categories: [],
   places: [],
+  communities: [],
 };
 
 /* ── HTML escaping (XSS prevention) ──────────────────────────────── */
@@ -35,7 +36,7 @@ function esc(str) {
   return d.innerHTML;
 }
 
-/* ── Toast notifications (replaces Flask flash) ──────────────────── */
+/* ── Toast notifications ─────────────────────────────────────────── */
 
 function showToast(message, type = "success") {
   const container = document.getElementById("toastContainer");
@@ -56,7 +57,7 @@ function showToast(message, type = "success") {
   }
 }
 
-/* ── Relative timestamps ("3 h ago") ─────────────────────────────── */
+/* ── Relative timestamps ─────────────────────────────────────────── */
 
 function timeAgo(dateStr) {
   const date = new Date(dateStr);
@@ -98,6 +99,11 @@ function renderCard(p) {
     imagesHtml = `<div class="row image-grid g-2 mb-2">${imgItems}</div>`;
   }
 
+  // Community badge
+  const communityBadge = p.community
+    ? `<span class="badge badge-community">${esc(p.community)}</span>`
+    : "";
+
   // Owner actions
   let ownerHtml = "";
   if (isOwner) {
@@ -121,23 +127,27 @@ function renderCard(p) {
     }
   }
 
+  // Contact line
+  let contactParts = [`<strong>Contact:</strong> ${esc(p.name)}`];
+  if (p.phone) contactParts.push(`Phone: <a class="link-light" href="tel:${esc(p.phone)}">${esc(p.phone)}</a>`);
+  const contactLine = contactParts.join(" &middot; ");
+
   return `
     <div class="${cardClasses}">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-start">
           <h5 class="card-title mb-1">${esc(p.item_name)}</h5>
-          <div class="d-flex gap-2 flex-shrink-0 ms-2">
+          <div class="d-flex gap-2 flex-shrink-0 ms-2 flex-wrap">
             <span class="badge ${p.kind === "found" ? "badge-found" : "badge-lost"}">${esc(p.kind.toUpperCase())}</span>
             <span class="badge bg-secondary">${esc(p.category || "Other")}</span>
+            ${communityBadge}
           </div>
         </div>
         ${p.description ? `<p class="muted mb-2">${esc(p.description)}</p>` : ""}
         ${imagesHtml}
         <div class="small muted">
-          <strong>Contact:</strong> ${esc(p.name)} &middot; Enroll: ${esc(p.enrollment)} &middot;
-          Phone: <a class="link-light" href="tel:${esc(p.phone)}">${esc(p.phone)}</a> &middot;
-          Hostel: ${esc(p.hostel)}<br>
-          <strong>Place:</strong> ${esc(p.place || "Other")} &middot;
+          ${contactLine}<br>
+          <strong>Location:</strong> ${esc(p.place || "Other")} &middot;
           <strong>Posted:</strong>
           <time class="timeago" datetime="${esc(p.created_at)}">${esc(p.created_at)}</time>
         </div>
@@ -152,7 +162,7 @@ function renderEmptyState(kind) {
       <div class="empty-state">
         <div class="empty-icon">📦</div>
         <h5>No found items posted yet</h5>
-        <p>Found something on campus? Post it here to help reunite it with its owner.</p>
+        <p>Found something in your community? Post it here to help reunite it with its owner.</p>
         <button class="btn btn-outline-success btn-sm" onclick="openPostModal('found')">Post a found item</button>
       </div>`;
   }
@@ -160,7 +170,7 @@ function renderEmptyState(kind) {
     <div class="empty-state">
       <div class="empty-icon">🔍</div>
       <h5>No lost items reported</h5>
-      <p>Lost something? Post the details and someone on campus might have found it.</p>
+      <p>Lost something? Post the details and someone in your community might have found it.</p>
       <button class="btn btn-outline-danger btn-sm" onclick="openPostModal('lost')">Report a lost item</button>
     </div>`;
 }
@@ -171,12 +181,11 @@ function renderNavbar() {
   const nav = document.getElementById("navAuth");
   if (state.user) {
     nav.innerHTML = `
-      <span class="me-2 d-none d-md-inline">Hi, ${esc(state.user.name)} (${esc(state.user.email)})</span>
-      <span class="me-2 d-md-none">${esc(state.user.name)}</span>
-      <button class="btn btn-outline-light btn-sm" id="logoutBtn">Logout</button>`;
+      <span class="me-2 d-none d-md-inline text-secondary-custom">${esc(state.user.name)}</span>
+      <button class="btn btn-outline-light btn-sm" id="logoutBtn">Sign Out</button>`;
     document.getElementById("logoutBtn").addEventListener("click", handleLogout);
   } else {
-    nav.innerHTML = `<button class="btn btn-primary btn-sm" id="openLogin">Login / Register</button>`;
+    nav.innerHTML = `<button class="btn btn-primary btn-sm" id="openLogin">Sign In</button>`;
     document.getElementById("openLogin").addEventListener("click", () => {
       new bootstrap.Modal(document.getElementById("authModal")).show();
     });
@@ -186,14 +195,12 @@ function renderNavbar() {
 /* ── Populate select dropdowns from meta ─────────────────────────── */
 
 function populateSelects() {
-  const ids = ["filterCategory", "postCategory"];
-  ids.forEach(id => {
+  // Categories
+  ["filterCategory", "postCategory"].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
-    // Keep the first <option> (placeholder) and remove the rest
-    while (sel.options.length > (id.startsWith("filter") ? 1 : 0)) {
+    while (sel.options.length > (id.startsWith("filter") ? 1 : 0))
       sel.remove(sel.options.length - 1);
-    }
     state.categories.forEach(c => {
       const opt = document.createElement("option");
       opt.value = c; opt.textContent = c;
@@ -201,16 +208,28 @@ function populateSelects() {
     });
   });
 
-  const placeIds = ["filterPlace", "postPlace"];
-  placeIds.forEach(id => {
+  // Places
+  ["filterPlace", "postPlace"].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
-    while (sel.options.length > (id.startsWith("filter") ? 1 : 0)) {
+    while (sel.options.length > (id.startsWith("filter") ? 1 : 0))
       sel.remove(sel.options.length - 1);
-    }
     state.places.forEach(p => {
       const opt = document.createElement("option");
       opt.value = p; opt.textContent = p;
+      sel.appendChild(opt);
+    });
+  });
+
+  // Communities
+  ["communitySelect", "postCommunity"].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    while (sel.options.length > (id === "communitySelect" ? 1 : 0))
+      sel.remove(sel.options.length - 1);
+    state.communities.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c; opt.textContent = c;
       sel.appendChild(opt);
     });
   });
@@ -224,14 +243,16 @@ function getSearchParams() {
     q: params.get("q") || "",
     cat: params.get("cat") || "",
     place: params.get("place") || "",
+    community: params.get("community") || "",
   };
 }
 
-function setSearchParams(q, cat, place) {
+function setSearchParams(q, cat, place, community) {
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (cat) params.set("cat", cat);
   if (place) params.set("place", place);
+  if (community) params.set("community", community);
   const qs = params.toString();
   const newUrl = qs ? `?${qs}` : window.location.pathname;
   history.pushState({}, "", newUrl);
@@ -240,11 +261,12 @@ function setSearchParams(q, cat, place) {
 /* ── Data loading ────────────────────────────────────────────────── */
 
 async function loadPosts() {
-  const { q, cat, place } = getSearchParams();
+  const { q, cat, place, community } = getSearchParams();
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (cat) params.set("cat", cat);
   if (place) params.set("place", place);
+  if (community) params.set("community", community);
 
   const qs = params.toString();
 
@@ -284,7 +306,7 @@ async function loadPosts() {
     lostBadge.classList.add("d-none");
   }
 
-  // Activate timeago + countdowns after render
+  // Post-render hooks
   setupTimeago();
   setupCountdowns();
 }
@@ -303,8 +325,8 @@ async function handleLogin(e) {
     state.user = res.data.user;
     bootstrap.Modal.getInstance(document.getElementById("authModal"))?.hide();
     renderNavbar();
-    showToast("Logged in successfully.", "success");
-    loadPosts(); // Re-render cards for ownership
+    showToast("Signed in successfully.", "success");
+    loadPosts();
     prefillPostForm();
   } else {
     const err = document.getElementById("authError");
@@ -319,9 +341,7 @@ async function handleRegister(e) {
   const body = {
     name: form.name.value.trim(),
     email: form.email.value.trim(),
-    enrollment: form.enrollment.value.trim(),
     phone: form.phone.value.trim(),
-    hostel: form.hostel.value.trim(),
     password: form.password.value,
   };
 
@@ -331,7 +351,7 @@ async function handleRegister(e) {
     state.user = res.data.user;
     bootstrap.Modal.getInstance(document.getElementById("authModal"))?.hide();
     renderNavbar();
-    showToast("Account created and logged in.", "success");
+    showToast("Account created. Welcome!", "success");
     loadPosts();
     prefillPostForm();
   } else {
@@ -345,7 +365,7 @@ async function handleLogout() {
   await api("/api/auth/logout", { method: "POST" });
   state.user = null;
   renderNavbar();
-  showToast("Logged out.", "success");
+  showToast("Signed out.", "success");
   loadPosts();
 }
 
@@ -355,20 +375,16 @@ function prefillPostForm() {
   if (!state.user) return;
   const u = state.user;
   const name = document.getElementById("postName");
-  const enrollment = document.getElementById("postEnrollment");
   const phone = document.getElementById("postPhone");
-  const hostel = document.getElementById("postHostel");
   if (name && !name.value) name.value = u.name || "";
-  if (enrollment && !enrollment.value) enrollment.value = u.enrollment || "";
   if (phone && !phone.value) phone.value = u.phone || "";
-  if (hostel && !hostel.value) hostel.value = u.hostel || "";
 }
 
 function openPostModal(kind) {
   if (!state.user) {
     const err = document.getElementById("authError");
     if (err) {
-      err.textContent = "You need to login first.";
+      err.textContent = "You need to sign in first.";
       err.classList.remove("d-none");
     }
     new bootstrap.Modal(document.getElementById("authModal")).show();
@@ -381,8 +397,14 @@ function openPostModal(kind) {
 
   const isFound = kind === "found";
   document.getElementById("postModalTitle").textContent = isFound
-    ? "Post a FOUND item" : "Post a LOST item";
+    ? "Post a found item" : "Report a lost item";
   document.getElementById("postKind").value = kind;
+
+  // Pre-select community from search filter if set
+  const currentCommunity = document.getElementById("communitySelect").value;
+  if (currentCommunity) {
+    document.getElementById("postCommunity").value = currentCommunity;
+  }
 
   prefillPostForm();
   new bootstrap.Modal(document.getElementById("postModal")).show();
@@ -426,7 +448,7 @@ async function handlePostSubmit(e) {
 
     if (data.ok) {
       bootstrap.Modal.getInstance(document.getElementById("postModal"))?.hide();
-      showToast("Posted successfully.", "success");
+      showToast("Posted successfully!", "success");
       loadPosts();
     } else {
       showToast(data.error || "Post failed.", "error");
@@ -446,7 +468,7 @@ async function handleDelete(postId) {
 
   const res = await api(`/api/posts/${postId}/delete`, { method: "POST" });
   if (res.ok) {
-    showToast("Deletion started. The post will be removed in 60 seconds.", "warning");
+    showToast("Deletion started. Post will be removed in 60 seconds.", "warning");
     loadPosts();
   } else {
     showToast(res.error || "Could not delete.", "error");
@@ -461,23 +483,27 @@ function setupSearch() {
   const btn = document.getElementById("searchBtn");
   const hiddenCat = document.getElementById("hiddenCat");
   const hiddenPlace = document.getElementById("hiddenPlace");
+  const communitySelect = document.getElementById("communitySelect");
 
   // Restore from URL on initial load
-  const { q, cat, place } = getSearchParams();
+  const { q, cat, place, community } = getSearchParams();
   if (q) input.value = q;
   if (cat) hiddenCat.value = cat;
   if (place) hiddenPlace.value = place;
+  if (community) communitySelect.value = community;
 
   function doSearch() {
     const query = input.value.trim();
     const category = hiddenCat.value;
     const placeVal = hiddenPlace.value;
-    setSearchParams(query, category, placeVal);
+    const comm = communitySelect.value;
+    setSearchParams(query, category, placeVal, comm);
     loadPosts();
   }
 
   btn.addEventListener("click", doSearch);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
+  communitySelect.addEventListener("change", doSearch);
 
   // Back/forward navigation
   window.addEventListener("popstate", () => {
@@ -485,6 +511,7 @@ function setupSearch() {
     input.value = p.q;
     hiddenCat.value = p.cat;
     hiddenPlace.value = p.place;
+    communitySelect.value = p.community;
     loadPosts();
   });
 }
@@ -518,7 +545,8 @@ function setupFilters() {
     hiddenPlace.value = selPlace.value || "";
     modal.hide();
     const query = document.getElementById("searchInput").value.trim();
-    setSearchParams(query, hiddenCat.value, hiddenPlace.value);
+    const comm = document.getElementById("communitySelect").value;
+    setSearchParams(query, hiddenCat.value, hiddenPlace.value, comm);
     loadPosts();
   });
 }
@@ -534,7 +562,7 @@ function setupCountdowns() {
       const remain = Math.max(0, eta - now);
       el.textContent = remain + "s";
       if (remain > 0) setTimeout(tick, 1000);
-      else loadPosts(); // Refresh instead of full page reload
+      else loadPosts();
     }
     tick();
   });
@@ -612,16 +640,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (metaRes.ok) {
     state.categories = metaRes.data.categories;
     state.places = metaRes.data.places;
+    state.communities = metaRes.data.communities;
   }
 
   // 2. Render initial UI
   renderNavbar();
   populateSelects();
 
-  // 3. Restore filter selects from URL
-  const { cat, place } = getSearchParams();
+  // 3. Restore filters from URL
+  const { cat, place, community } = getSearchParams();
   if (cat) document.getElementById("filterCategory").value = cat;
   if (place) document.getElementById("filterPlace").value = place;
+  if (community) document.getElementById("communitySelect").value = community;
 
   // 4. Load posts
   await loadPosts();

@@ -24,6 +24,7 @@ from .config import (
     DELETE_DELAY_SECONDS,
     CATEGORIES,
     PLACES,
+    COMMUNITIES,
     SECRET_KEY,
 )
 from .database import get_db, close_db, init_db, cleanup_stale_deletes, reset_old_users
@@ -71,11 +72,12 @@ def create_app():
         return jsonify(ok=True, data={
             "categories": CATEGORIES,
             "places": PLACES,
+            "communities": COMMUNITIES,
         })
 
     # ── API: Auth ────────────────────────────────────────────────────
     #
-    # Temporary local auth (email + password).
+    # Temporary local auth (email + password) for development.
     # Will be replaced by Microsoft OAuth / Azure AD once available.
 
     @app.route("/api/auth/session")
@@ -110,22 +112,22 @@ def create_app():
         body = request.get_json(silent=True) or {}
         name = body.get("name", "").strip()
         email = body.get("email", "").strip().lower()
-        enrollment = body.get("enrollment", "").strip()
         phone = body.get("phone", "").strip()
-        hostel = body.get("hostel", "").strip()
         password = body.get("password", "")
+        community = body.get("community", "").strip() or None
 
-        if not all([name, email, enrollment, phone, hostel, password]):
-            return jsonify(ok=False, error="All fields are required."), 400
+        if not all([name, email, password]):
+            return jsonify(ok=False, error="Name, email, and password are required."), 400
 
         db = get_db()
         try:
             db.execute(
-                "INSERT INTO users (name,enrollment,phone,hostel,email,password_hash,created_at) "
-                "VALUES (?,?,?,?,?,?,?)",
+                "INSERT INTO users (name,email,phone,password_hash,community,created_at) "
+                "VALUES (?,?,?,?,?,?)",
                 (
-                    name, enrollment, phone, hostel, email,
+                    name, email, phone or None,
                     generate_password_hash(password),
+                    community,
                     datetime.now(timezone.utc).isoformat(),
                 ),
             )
@@ -162,6 +164,7 @@ def create_app():
         q = request.args.get("q", "").strip()
         cat = request.args.get("cat", "").strip()
         place = request.args.get("place", "").strip()
+        community = request.args.get("community", "").strip()
 
         db = get_db()
         sql = "SELECT * FROM posts WHERE kind = ?"
@@ -176,6 +179,9 @@ def create_app():
         if place:
             sql += " AND place = ?"
             args.append(place)
+        if community:
+            sql += " AND community = ?"
+            args.append(community)
 
         sql += " ORDER BY created_at DESC"
 
@@ -186,18 +192,7 @@ def create_app():
                 "SELECT filename FROM images WHERE post_id = ?", (p["id"],)
             ).fetchall()
 
-            post_dict = {**dict(p), "images": [r["filename"] for r in imgs]}
-
-            if p["status"] == "pending_delete" and p["delete_at"]:
-                try:
-                    post_dict["delete_eta_ts"] = int(
-                        datetime.fromisoformat(p["delete_at"]).timestamp()
-                    )
-                except Exception:
-                    post_dict["delete_eta_ts"] = 0
-            else:
-                post_dict["delete_eta_ts"] = 0
-
+            post_dict = _post_dict(p, [r["filename"] for r in imgs])
             result.append(post_dict)
 
         return jsonify(ok=True, data={"posts": result})
@@ -206,7 +201,7 @@ def create_app():
     def api_create_post():
         uid = session.get("uid")
         if not uid:
-            return jsonify(ok=False, error="You need to login first."), 401
+            return jsonify(ok=False, error="You need to sign in first."), 401
 
         db = get_db()
         u = db.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
@@ -220,12 +215,14 @@ def create_app():
         item_name = request.form.get("item_name", "").strip()
         description = request.form.get("description", "").strip()
         name = request.form.get("name", "").strip()
-        enrollment = request.form.get("enrollment", "").strip()
         phone = request.form.get("phone", "").strip()
-        hostel = request.form.get("hostel", "").strip()
         category = request.form.get("category", "Other").strip()
         place = request.form.get("place", "Other").strip()
+        community = request.form.get("community", "").strip() or None
         files = request.files.getlist("images")
+
+        if not item_name:
+            return jsonify(ok=False, error="Item name is required."), 400
 
         real_files = [f for f in files if f and f.filename]
         if len(real_files) > MAX_UPLOAD_FILES:
@@ -235,12 +232,12 @@ def create_app():
         cur.execute(
             """
             INSERT INTO posts (user_id,kind,item_name,description,category,place,
-                               name,enrollment,phone,hostel,created_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                               community,name,phone,created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 u["id"], kind, item_name, description, category, place,
-                name, enrollment, phone, hostel,
+                community, name, phone,
                 datetime.now(timezone.utc).isoformat(),
             ),
         )
@@ -260,7 +257,7 @@ def create_app():
     def api_begin_delete(post_id):
         uid = session.get("uid")
         if not uid:
-            return jsonify(ok=False, error="You need to login first."), 401
+            return jsonify(ok=False, error="You need to sign in first."), 401
 
         db = get_db()
         post = db.execute("SELECT * FROM posts WHERE id = ?", (post_id,)).fetchone()
@@ -291,9 +288,36 @@ def create_app():
             "id": u["id"],
             "name": u["name"],
             "email": u["email"],
-            "enrollment": u["enrollment"],
             "phone": u["phone"],
-            "hostel": u["hostel"],
+            "community": u["community"],
+        }
+
+    def _post_dict(p, images):
+        """Convert a post Row to a clean API dict."""
+        delete_eta_ts = 0
+        if p["status"] == "pending_delete" and p["delete_at"]:
+            try:
+                delete_eta_ts = int(
+                    datetime.fromisoformat(p["delete_at"]).timestamp()
+                )
+            except Exception:
+                pass
+
+        return {
+            "id": p["id"],
+            "user_id": p["user_id"],
+            "kind": p["kind"],
+            "item_name": p["item_name"],
+            "description": p["description"],
+            "category": p["category"],
+            "place": p["place"],
+            "community": p["community"],
+            "name": p["name"],
+            "phone": p["phone"],
+            "status": p["status"],
+            "created_at": p["created_at"],
+            "images": images,
+            "delete_eta_ts": delete_eta_ts,
         }
 
     def _allowed_file(filename):

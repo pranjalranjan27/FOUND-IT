@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Found IT — Campus Lost &amp; Found. Post items you've found or lost on campus to help reunite belongings with their owners.">
-  <title>Found IT — Lost &amp; Found</title>
+  <meta name="description" content="Found IT — Community Lost &amp; Found. Post items you've found or lost in your community to help reunite belongings with their owners.">
+  <title>Found IT — Community Lost &amp; Found</title>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,21 +26,27 @@
       <span class="brand-icon">🧭</span> Found IT
     </a>
     <div class="ms-auto d-flex align-items-center gap-2" id="navAuth">
-      <!-- JS fills: user info + logout, or login button -->
-      <button class="btn btn-primary btn-sm" id="openLogin">Login / Register</button>
+      <!-- JS fills: user info + logout, or sign-in button -->
+      <button class="btn btn-primary btn-sm" id="openLogin">Sign In</button>
     </div>
   </div>
 </nav>
 
-<!-- ── Toast container (replaces flash messages) ─────────────────── -->
+<!-- ── Toast container ───────────────────────────────────────────── -->
 <div class="container" id="toastContainer"></div>
 
 <div class="container pb-4">
 
-  <!-- ── Search bar ── -->
+  <!-- ── Search bar + community filter ── -->
   <div class="row g-2 mb-3" id="searchForm">
-    <div class="col-md-7">
-      <input class="form-control" id="searchInput" placeholder="Search by item or description">
+    <div class="col-md-3">
+      <select class="form-select community-select" id="communitySelect">
+        <option value="">All communities</option>
+        <!-- JS populates from /api/meta -->
+      </select>
+    </div>
+    <div class="col-md-4">
+      <input class="form-control" id="searchInput" placeholder="Search items…">
     </div>
     <input type="hidden" id="hiddenCat">
     <input type="hidden" id="hiddenPlace">
@@ -70,15 +76,13 @@
             <label class="form-label">Category</label>
             <select class="form-select" id="filterCategory">
               <option value="">All categories</option>
-              <!-- JS populates from /api/meta -->
             </select>
           </div>
-          <hr class="text-secondary">
+          <hr>
           <div class="mb-2">
-            <label class="form-label">Place</label>
+            <label class="form-label">Location</label>
             <select class="form-select" id="filterPlace">
-              <option value="">Any place</option>
-              <!-- JS populates from /api/meta -->
+              <option value="">Any location</option>
             </select>
           </div>
         </div>
@@ -94,13 +98,13 @@
   <ul class="nav nav-pills mb-3 justify-content-center" id="pills-tab" role="tablist">
     <li class="nav-item" role="presentation">
       <button class="nav-link active" id="got-tab" data-bs-toggle="pill" data-bs-target="#got" type="button" role="tab">
-        Got Something
+        Found Items
         <span class="badge bg-light text-dark ms-1 d-none" id="foundBadge"></span>
       </button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="lost-tab" data-bs-toggle="pill" data-bs-target="#lost" type="button" role="tab">
-        Lost Something
+        Lost Items
         <span class="badge bg-light text-dark ms-1 d-none" id="lostBadge"></span>
       </button>
     </li>
@@ -112,29 +116,29 @@
     <!-- Found tab -->
     <div class="tab-pane fade show active" id="got" role="tabpanel">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">Items people have FOUND</h4>
+        <h4 class="section-title mb-0">Items people have found</h4>
         <button class="btn btn-success" onclick="openPostModal('found')">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-lg me-1" viewBox="0 0 16 16">
             <path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
           </svg>
-          Found something
+          I Found Something
         </button>
       </div>
-      <div id="foundCards"><!-- JS renders cards here --></div>
+      <div id="foundCards"></div>
     </div>
 
     <!-- Lost tab -->
     <div class="tab-pane fade" id="lost" role="tabpanel">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">Items people have LOST</h4>
+        <h4 class="section-title mb-0">Items people have lost</h4>
         <button class="btn btn-danger" onclick="openPostModal('lost')">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-lg me-1" viewBox="0 0 16 16">
             <path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
           </svg>
-          I Lost It
+          I Lost Something
         </button>
       </div>
-      <div id="lostCards"><!-- JS renders cards here --></div>
+      <div id="lostCards"></div>
     </div>
   </div>
 
@@ -155,11 +159,13 @@
           <div class="row g-2">
             <div class="col-md-6">
               <label class="form-label">Item name</label>
-              <input class="form-control" name="item_name" id="postItemName" required>
+              <input class="form-control" name="item_name" id="postItemName" placeholder="e.g. Black wallet, iPhone 15" required>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Hostel Block</label>
-              <input class="form-control" name="hostel" id="postHostel" required>
+              <label class="form-label">Community</label>
+              <select class="form-select" name="community" id="postCommunity" required>
+                <!-- JS populates from /api/meta -->
+              </select>
             </div>
           </div>
 
@@ -167,39 +173,33 @@
             <div class="col-md-6">
               <label class="form-label">Category</label>
               <select class="form-select" name="category" id="postCategory" required>
-                <!-- JS populates from /api/meta -->
               </select>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Place</label>
+              <label class="form-label">Location</label>
               <select class="form-select" name="place" id="postPlace" required>
-                <!-- JS populates from /api/meta -->
               </select>
             </div>
           </div>
 
           <div class="mt-2">
             <label class="form-label">Description</label>
-            <textarea class="form-control" name="description" id="postDescription" rows="2"></textarea>
+            <textarea class="form-control" name="description" id="postDescription" rows="2" placeholder="Color, brand, distinguishing marks…"></textarea>
           </div>
 
           <div class="row g-2 mt-1">
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label">Your Name</label>
               <input class="form-control" name="name" id="postName" required>
             </div>
-            <div class="col-md-4">
-              <label class="form-label">Enrollment No.</label>
-              <input class="form-control" name="enrollment" id="postEnrollment" required>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Phone</label>
-              <input class="form-control" name="phone" id="postPhone" required>
+            <div class="col-md-6">
+              <label class="form-label">Phone (optional)</label>
+              <input class="form-control" name="phone" id="postPhone" type="tel">
             </div>
           </div>
 
           <div class="mt-3">
-            <label class="form-label">Upload up to 3 images</label>
+            <label class="form-label">Images (up to 3)</label>
             <input type="file" class="form-control" name="images" id="imageInput" multiple accept="image/*">
             <div id="imagePreview" class="row g-2 mt-2"></div>
           </div>
@@ -238,6 +238,22 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
+
+        <!-- Microsoft OAuth (future) -->
+        <button type="button" class="btn-microsoft" disabled title="Coming soon">
+          <svg viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+            <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+            <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+            <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+          </svg>
+          Continue with Microsoft
+        </button>
+        <p class="text-center mt-2 mb-0" style="font-size:.75rem; color:var(--muted);">Institutional SSO — coming soon</p>
+
+        <div class="auth-divider">dev login</div>
+
+        <!-- Dev login tabs -->
         <ul class="nav nav-tabs" id="authTabs" role="tablist">
           <li class="nav-item" role="presentation">
             <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#loginTab" type="button">Login</button>
@@ -276,25 +292,15 @@
               </div>
               <div class="row g-2 mt-1">
                 <div class="col-12 col-sm-6">
-                  <label class="form-label">Enrollment No.</label>
-                  <input class="form-control" name="enrollment" required>
-                </div>
-                <div class="col-12 col-sm-6">
-                  <label class="form-label">Phone</label>
-                  <input class="form-control" name="phone" type="tel" required>
-                </div>
-              </div>
-              <div class="row g-2 mt-1">
-                <div class="col-12 col-sm-6">
-                  <label class="form-label">Hostel Block</label>
-                  <input class="form-control" name="hostel" required>
+                  <label class="form-label">Phone (optional)</label>
+                  <input class="form-control" name="phone" type="tel">
                 </div>
                 <div class="col-12 col-sm-6">
                   <label class="form-label">Password</label>
                   <input type="password" class="form-control" name="password" required>
                 </div>
               </div>
-              <button class="btn btn-success w-100 mt-3">Create Account</button>
+              <button class="btn btn-primary w-100 mt-3">Create Account</button>
             </form>
           </div>
         </div>

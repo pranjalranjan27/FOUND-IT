@@ -43,8 +43,15 @@ CATEGORIES = [
 ]
 
 PLACES = [
-    "Library", "Canteen", "Hostel Gate", "Lecture Hall", "Ground",
-    "Parking", "Computer Lab", "Bus Stop", "Auditorium", "Other",
+    "Library", "Cafeteria", "Classroom", "Entrance / Gate",
+    "Parking", "Lab", "Sports Area", "Transit Area",
+    "Auditorium", "Hostel", "Other",
+]
+
+COMMUNITIES = [
+    "Bennett University", "Delhi University", "KIIT",
+    "IIT Delhi", "Amity University", "Manipal University",
+    "Apartment Complex", "Office Campus", "Public",
 ]
 
 # ── Flask settings ───────────────────────────────────────────────────

@@ -44,21 +44,23 @@ def init_db():
     conn = _connect()
     cur = conn.cursor()
 
+    # ── Users ─────────────────────────────────────────────────────
+    # Simplified: no enrollment or hostel.  Community is optional.
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            enrollment TEXT NOT NULL,
-            phone TEXT NOT NULL,
-            hostel TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
+            phone TEXT,
             password_hash TEXT NOT NULL,
+            community TEXT,
             created_at TEXT NOT NULL
         )
         """
     )
 
+    # ── Posts ─────────────────────────────────────────────────────
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS posts (
@@ -69,10 +71,9 @@ def init_db():
             description TEXT,
             category TEXT,
             place TEXT,
+            community TEXT,
             name TEXT NOT NULL,
-            enrollment TEXT NOT NULL,
-            phone TEXT NOT NULL,
-            hostel TEXT NOT NULL,
+            phone TEXT,
             status TEXT NOT NULL DEFAULT 'active',
             delete_at TEXT,
             created_at TEXT NOT NULL,
@@ -81,6 +82,7 @@ def init_db():
         """
     )
 
+    # ── Safe migrations for existing databases ───────────────────
     cols = [r[1] for r in cur.execute("PRAGMA table_info(posts)").fetchall()]
 
     if "category" not in cols:
@@ -91,6 +93,10 @@ def init_db():
         cur.execute("ALTER TABLE posts ADD COLUMN place TEXT")
         cur.execute("UPDATE posts SET place = 'Other' WHERE place IS NULL")
 
+    if "community" not in cols:
+        cur.execute("ALTER TABLE posts ADD COLUMN community TEXT")
+
+    # ── Images ───────────────────────────────────────────────────
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS images (

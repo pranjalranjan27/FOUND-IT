@@ -1,7 +1,7 @@
 # 🧭 Found IT
 
-**Found IT** is a campus-based **Lost & Found Web Application** with a separated frontend/backend architecture.  
-Students can post items they've *found* or *lost* on campus, making it easy to reconnect belongings with their owners.
+**Found IT** is a **community-based Lost & Found platform** with a separated frontend/backend architecture.  
+Post items you've *found* or *lost* in your community — campus, apartment complex, office, or any group — to help reunite belongings with their owners.
 
 ---
 
@@ -17,30 +17,35 @@ SQLite Database
 
 The frontend is a **static client** — pure HTML, CSS, and vanilla JavaScript.  
 The backend is a **Flask REST API** — no Jinja templates, only JSON endpoints.  
-Both are served from a single `python run.py` command during development.
+Both are served from a single `python run.py` command.
 
 ---
 
 ## 🚀 Features
 
+### 🏘️ Community-Based
+- Posts belong to **communities** (universities, apartments, offices, etc.)
+- Search and filter scoped by community
+- Promotes **local trust and relevance**
+
 ### 👤 Authentication
-- Local registration and login (any email accepted during development)
-- Passwords stored with **bcrypt-level hashing** via Werkzeug
-- Session-based login with Flask secure cookies
-- 🔜 **Microsoft OAuth / Azure AD** integration planned for production
+- Development: email/password login
+- Production: **Microsoft OAuth / Azure AD** (UI-ready, backend pending)
+- Session-based with Flask secure cookies
 
 ### 🎒 Lost & Found System
 - Post items you've **found** or **lost** with:
-  - Item name, description, category, place, hostel block
+  - Item name, description, category, location, community
   - Up to **3 image uploads** per post
 - Separate tabs for Found and Lost items
 - Post count badges on each tab
 
 ### 🔍 Search & Filter
 - **Keyword search** across item names and descriptions
-- **Category filter** (Mobile, Laptop, Charger, Book, ID Card, etc.)
-- **Place filter** (Library, Canteen, Lecture Hall, Parking, etc.)
-- **URL persistence** — search state saved in URL via `history.pushState()`
+- **Community filter** — scoped to your community
+- **Category filter** (Mobile, Laptop, Wallet, Keys, etc.)
+- **Location filter** (Library, Cafeteria, Classroom, etc.)
+- **URL persistence** — search state saved via `history.pushState()`
 - Browser back/forward navigation works with search state
 
 ### 🕐 Smart Post Management
@@ -49,10 +54,11 @@ Both are served from a single `python run.py` command during development.
 - Orphaned deletions auto-recovered on server restart
 
 ### ✨ Modern Interface
-- Dark theme with **glassmorphic cards** and hover effects
-- **Image lightbox** — click any thumbnail to view full-size
+- Dark charcoal theme with subtle blue accents
+- Elevated cards with shadow depth
+- **Image lightbox** — click thumbnails to view full-size
 - **Image preview** before upload with remove buttons
-- **Relative timestamps** ("3 h ago" instead of raw ISO dates)
+- **Relative timestamps** ("3 h ago")
 - Toast notifications with auto-dismiss
 - Loading spinner on form submission
 - Responsive design optimized for mobile
@@ -86,12 +92,12 @@ Found IT/
 │   ├── requirements.txt        ← Python dependencies
 │   ├── instance/
 │   │   └── foundit.db          ← SQLite database (auto-created)
-│   └── uploads/                ← User-uploaded images (gitignored)
+│   └── uploads/                ← User-uploaded images
 │
 ├── frontend/
 │   ├── index.html              ← Complete static page
 │   ├── css/
-│   │   └── style.css           ← Dark theme, animations, responsive
+│   │   └── style.css           ← Dark charcoal theme
 │   └── js/
 │       └── app.js              ← Fetch-based client logic
 │
@@ -104,7 +110,7 @@ Found IT/
 ## 🛠️ Setup & Run
 
 ### Prerequisites
-- **Python 3.10+** installed on your system
+- **Python 3.10+**
 
 ### 1. Clone the repository
 ```bash
@@ -148,22 +154,19 @@ Navigate to **http://127.0.0.1:5000**
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/api/meta` | Categories and places |
+| `GET` | `/api/meta` | Categories, locations, communities |
 | `GET` | `/api/auth/session` | Current user info |
 | `POST` | `/api/auth/login` | Login (JSON body) |
 | `POST` | `/api/auth/register` | Register (JSON body) |
 | `POST` | `/api/auth/logout` | Logout |
-| `GET` | `/api/posts?kind=found&q=...&cat=...&place=...` | List posts |
+| `GET` | `/api/posts?kind=&q=&cat=&place=&community=` | List posts |
 | `POST` | `/api/posts` | Create post (FormData) |
 | `POST` | `/api/posts/<id>/delete` | Begin 60s deletion |
 | `GET` | `/uploads/<filename>` | Serve uploaded images |
 
 ### Response Format
 ```json
-// Success
 { "ok": true, "data": { ... } }
-
-// Failure
 { "ok": false, "error": "Error message" }
 ```
 
@@ -171,65 +174,56 @@ Navigate to **http://127.0.0.1:5000**
 
 ## 🗄️ Database
 
-The app uses **SQLite** with 3 tables:
-
 | Table | Purpose |
 |-------|---------|
-| `users` | Student accounts (name, email, enrollment, phone, hostel, password hash) |
-| `posts` | Lost/found items (item details, contact info, status, timestamps) |
+| `users` | Accounts (name, email, phone, community, password hash) |
+| `posts` | Lost/found items (item details, community, contact, status) |
 | `images` | Filenames linked to posts (up to 3 per post) |
 
-The database is **auto-created** on the first run. No setup needed.
+The database is **auto-created** on the first run.
 
-> **Future:** The database layer is isolated in `backend/database.py`, making PostgreSQL migration a single-file change.
+> The database layer is isolated in `backend/database.py`. PostgreSQL migration is a single-file change.
 
 ---
 
-## 🔒 Security Features
+## 🔒 Security
 
 - ✅ Password hashing (Werkzeug `pbkdf2:sha256`)
 - ✅ Parameterized SQL queries (no SQL injection)
-- ✅ `secure_filename()` for uploaded files
-- ✅ HTML escaping in JS (XSS prevention)
-- ✅ Ownership validation before post deletion
+- ✅ `secure_filename()` for uploads
+- ✅ HTML escaping in JS (`esc()` helper)
+- ✅ Ownership validation before deletion
 - ✅ 8 MB max upload size
 
 ---
 
 ## 🚀 Deployment
 
-The architecture is designed for separate hosting:
-
 | Component | Recommended Host |
 |-----------|-----------------|
 | **Frontend** (`frontend/`) | Vercel, Netlify, GitHub Pages |
 | **Backend** (`backend/` + `run.py`) | Render, Railway, Fly.io |
 
-For separate deployment, add `flask-cors` to the backend and configure the frontend API base URL.
-
 ---
 
-## 🔮 Future Scope
+## 🔮 Roadmap
 
-- **Microsoft OAuth / Azure AD login** (replace local auth with institutional SSO)
-- **PostgreSQL migration** (swap `backend/database.py`)
-- Claim request system (request → owner approves → resolved)
-- User profile page with post history
+- **Microsoft OAuth / Azure AD** — institutional SSO login
+- **PostgreSQL** — production database
+- Claim request workflow (request → approve → resolved)
+- Match suggestions (auto-match lost and found items)
+- User profile with post history
 - Email notifications for matching items
-- Pagination for large post volumes
-- Dark / light theme toggle
 - Admin moderation panel
 
 ---
 
 ## 🔐 Developer Note: Authentication
 
-> **Current status:** The app uses temporary local email/password authentication for development.
-> Old test accounts are cleared on every server restart.
+> **Current:** Temporary email/password auth for development. Old accounts cleared on startup.
 >
-> **Future plan:** Replace local auth with **Microsoft OAuth (Azure AD)** once institutional SSO access is available.
-> The backend has placeholder route stubs (`/api/auth/microsoft`, `/api/auth/callback`) in `backend/app.py`.
-> The users table, session system, and auth endpoints are designed to work with either auth method.
+> **Future:** Microsoft OAuth (Azure AD). The frontend already shows "Continue with Microsoft" (disabled).
+> Backend has placeholder route stubs in `backend/app.py`.
 
 ---
 
