@@ -7,6 +7,8 @@ To migrate to PostgreSQL later, swap DATABASE_URI.
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv()
 
 # ── Directory layout ─────────────────────────────────────────────────
 
@@ -22,12 +24,25 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Database ─────────────────────────────────────────────────────────
 
-DATABASE_URI = INSTANCE_DIR / "foundit.db"
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# If DATABASE_URL is set (production / Supabase), use PostgreSQL.
+# Otherwise fall back to the local SQLite file.
+if DATABASE_URL:
+    # Render sometimes provides postgres:// which psycopg2 needs as postgresql://
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    IS_POSTGRES = True
+else:
+    DATABASE_URI = INSTANCE_DIR / "foundit.db"
+    IS_POSTGRES = False
 
 # ── File uploads ─────────────────────────────────────────────────────
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+CLAIM_ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "pdf"}
 MAX_UPLOAD_FILES = 3
+MAX_CLAIM_FILES = 3
 MAX_CONTENT_MB = 8
 
 # ── Post deletion ───────────────────────────────────────────────────
@@ -56,4 +71,9 @@ COMMUNITIES = [
 
 # ── Flask settings ───────────────────────────────────────────────────
 
-SECRET_KEY = os.environ.get("FLASK_SECRET", "dev-secret-change-me")
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+
+SESSION_TYPE = "filesystem"

@@ -6,7 +6,7 @@
   <meta name="description" content="Found IT — Community Lost &amp; Found. Post items you've found or lost in your community to help reunite belongings with their owners.">
   <title>Found IT — Community Lost &amp; Found</title>
 
-  <!-- Google Fonts -->
+  <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -20,47 +20,44 @@
 <body>
 
 <!-- ── Navbar ─────────────────────────────────────────────────────── -->
-<nav class="navbar navbar-expand-lg navbar-dark mb-4">
-  <div class="container">
-    <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="/">
-      <span class="brand-icon">🧭</span> Found IT
+<nav class="navbar">
+  <div class="container d-flex justify-content-between align-items-center">
+    <a class="navbar-brand" href="/">
+      <img src="images/logo.png" alt="Found IT" class="brand-logo">
     </a>
-    <div class="ms-auto d-flex align-items-center gap-2" id="navAuth">
-      <!-- JS fills: user info + logout, or sign-in button -->
+    <div class="d-flex align-items-center gap-2" id="navAuth">
+      <!-- JS fills: user dropdown or sign-in button -->
       <button class="btn btn-primary btn-sm" id="openLogin">Sign In</button>
     </div>
   </div>
 </nav>
 
 <!-- ── Toast container ───────────────────────────────────────────── -->
-<div class="container" id="toastContainer"></div>
+<div class="container mt-3" id="toastContainer"></div>
 
-<div class="container pb-4">
+<div class="container pb-4" style="margin-top:24px">
 
-  <!-- ── Search bar + community filter ── -->
-  <div class="row g-2 mb-3" id="searchForm">
-    <div class="col-md-3">
-      <select class="form-select community-select" id="communitySelect">
-        <option value="">All communities</option>
-        <!-- JS populates from /api/meta -->
-      </select>
-    </div>
-    <div class="col-md-4">
+  <!-- ── Search bar ── -->
+  <div class="search-bar mb-3" id="searchForm">
+    <select class="select-custom" id="communitySelect">
+      <option value="">All communities</option>
+      <!-- JS populates from /api/meta -->
+    </select>
+    <div class="search-input-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+      </svg>
       <input class="form-control" id="searchInput" placeholder="Search items…">
     </div>
     <input type="hidden" id="hiddenCat">
     <input type="hidden" id="hiddenPlace">
-    <div class="col-md-2 d-grid">
-      <button type="button" class="btn btn-outline-light" id="filtersBtn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-funnel me-1" viewBox="0 0 16 16">
-          <path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .389.812l-4.64 5.76v4.928a.5.5 0 0 1-.724.447l-2.5-1.25A.5.5 0 0 1 6.25 11.5V7.572L1.611 1.812A.5.5 0 0 1 1.5 1.5z"/>
-        </svg>
-        Filters
-      </button>
-    </div>
-    <div class="col-md-3 d-grid">
-      <button class="btn btn-primary" id="searchBtn">Search</button>
-    </div>
+    <button type="button" class="btn btn-outline-secondary" id="filtersBtn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+        <path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .389.812l-4.64 5.76v4.928a.5.5 0 0 1-.724.447l-2.5-1.25A.5.5 0 0 1 6.25 11.5V7.572L1.611 1.812A.5.5 0 0 1 1.5 1.5z"/>
+      </svg>
+      Filters
+    </button>
+    <button class="btn btn-primary" id="searchBtn">Search</button>
   </div>
 
   <!-- ── Filters modal ── -->
@@ -98,14 +95,16 @@
   <ul class="nav nav-pills mb-3 justify-content-center" id="pills-tab" role="tablist">
     <li class="nav-item" role="presentation">
       <button class="nav-link active" id="got-tab" data-bs-toggle="pill" data-bs-target="#got" type="button" role="tab">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8.186 1.113a.5.5 0 0 0-.372 0L1.846 3.5l2.404.961L10.404 2zm3.564 1.426L5.596 5 8 5.961 14.154 3.5zm3.25 1.7-6.5 2.6v7.922l6.5-2.6V4.24zM7.5 14.762V6.838L1 4.239v7.923zM7.443.184a1.5 1.5 0 0 1 1.114 0l7.129 2.852A.5.5 0 0 1 16 3.5v8.662a1 1 0 0 1-.629.928l-7.185 2.874a.5.5 0 0 1-.372 0L.63 13.09a1 1 0 0 1-.63-.928V3.5a.5.5 0 0 1 .314-.464z"/></svg>
         Found Items
-        <span class="badge bg-light text-dark ms-1 d-none" id="foundBadge"></span>
+        <span class="badge bg-light text-dark d-none" id="foundBadge"></span>
       </button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="lost-tab" data-bs-toggle="pill" data-bs-target="#lost" type="button" role="tab">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/></svg>
         Lost Items
-        <span class="badge bg-light text-dark ms-1 d-none" id="lostBadge"></span>
+        <span class="badge bg-light text-dark d-none" id="lostBadge"></span>
       </button>
     </li>
   </ul>
@@ -115,34 +114,77 @@
 
     <!-- Found tab -->
     <div class="tab-pane fade show active" id="got" role="tabpanel">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="section-title mb-0">Items people have found</h4>
-        <button class="btn btn-success" onclick="openPostModal('found')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-lg me-1" viewBox="0 0 16 16">
+      <div class="section-header">
+        <h2 class="section-title">Items people have found</h2>
+        <button class="btn btn-success desktop-action-btn" onclick="openPostModal('found')">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
             <path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
           </svg>
           I Found Something
         </button>
       </div>
-      <div id="foundCards"></div>
+      <div id="foundCards" class="cards-grid"></div>
     </div>
 
     <!-- Lost tab -->
     <div class="tab-pane fade" id="lost" role="tabpanel">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="section-title mb-0">Items people have lost</h4>
-        <button class="btn btn-danger" onclick="openPostModal('lost')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-lg me-1" viewBox="0 0 16 16">
+      <div class="section-header">
+        <h2 class="section-title">Items people have lost</h2>
+        <button class="btn btn-orange desktop-action-btn" onclick="openPostModal('lost')">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
             <path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
           </svg>
           I Lost Something
         </button>
       </div>
-      <div id="lostCards"></div>
+      <div id="lostCards" class="cards-grid"></div>
     </div>
   </div>
 
 </div>
+
+<!-- ── Trust bar / footer ── -->
+<div class="trust-bar">
+  <div class="container">
+    <div class="row g-3 text-center">
+      <div class="col-6 col-md-3">
+        <div class="trust-item">
+          <div class="trust-icon">🛡️</div>
+          <div class="trust-title">Safe &amp; Secure</div>
+          <div class="trust-desc">Your data is protected</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="trust-item">
+          <div class="trust-icon">🤝</div>
+          <div class="trust-title">Community Driven</div>
+          <div class="trust-desc">Stronger together</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="trust-item">
+          <div class="trust-icon">⚡</div>
+          <div class="trust-title">Quick &amp; Easy</div>
+          <div class="trust-desc">Report in seconds</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="trust-item">
+          <div class="trust-icon">💜</div>
+          <div class="trust-title">Reunite &amp; Restore</div>
+          <div class="trust-desc">Help others, feel good</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Mobile FAB ── -->
+<button class="mobile-fab" id="mobileFab" title="Report an item">
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+    <path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
+  </svg>
+</button>
 
 <!-- ── Post creation modal ── -->
 <div class="modal fade" id="postModal" tabindex="-1">
@@ -216,6 +258,21 @@
   </div>
 </div>
 
+<!-- ── Item detail modal ── -->
+<div class="modal fade" id="itemDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content detail-modal">
+      <div class="modal-header">
+        <h5 class="modal-title" id="detailModalTitle">Item Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="detailModalBody">
+        <!-- JS fills -->
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Lightbox modal ── -->
 <div class="modal fade" id="lightboxModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -231,27 +288,29 @@
 
 <!-- ── Auth modal ── -->
 <div class="modal fade" id="authModal" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Welcome to Found IT</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
+      <div class="modal-body" style="padding:32px">
 
-        <!-- Microsoft OAuth (future) -->
-        <button type="button" class="btn-microsoft" disabled title="Coming soon">
-          <svg viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
-            <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-            <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-            <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-            <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+        <!-- Logo + Title -->
+        <div class="text-center" style="margin-bottom:24px">
+          <img src="images/logo.png" alt="Found IT" style="height:140px;margin:-40px auto -28px;display:block">
+          <h5 style="font-weight:600;font-size:1.1rem;color:var(--text);margin:0">Welcome to Found IT</h5>
+          <p style="font-size:.84rem;color:var(--muted);margin:4px 0 0">Sign in to post and manage items</p>
+        </div>
+
+        <!-- Google OAuth -->
+        <button type="button" class="btn-google" id="googleSignIn" onclick="window.location.href='/auth/google'">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
           </svg>
-          Continue with Microsoft
+          Continue with Google
         </button>
-        <p class="text-center mt-2 mb-0" style="font-size:.75rem; color:var(--muted);">Institutional SSO — coming soon</p>
 
-        <div class="auth-divider">dev login</div>
+        <div class="auth-divider">or use your email &amp; password</div>
 
         <!-- Dev login tabs -->
         <ul class="nav nav-tabs" id="authTabs" role="tablist">
@@ -268,11 +327,11 @@
             <form id="loginForm">
               <div class="mb-2">
                 <label class="form-label">Email</label>
-                <input class="form-control" name="email" type="email" required>
+                <input class="form-control" name="email" type="email" placeholder="Enter your email" required>
               </div>
-              <div class="mb-2">
+              <div class="mb-3">
                 <label class="form-label">Password</label>
-                <input type="password" class="form-control" name="password" required>
+                <input type="password" class="form-control" name="password" placeholder="Enter your password" required>
               </div>
               <button class="btn btn-primary w-100">Login</button>
             </form>
@@ -306,6 +365,116 @@
         </div>
 
         <div class="text-danger small pt-2 d-none" id="authError"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── My Posts & Activity modal ── -->
+<div class="modal fade" id="myPostsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">My Dashboard</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+
+        <!-- Dashboard tabs -->
+        <ul class="nav nav-tabs px-3 pt-3" id="dashTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#dashMyPosts" type="button">My Posts</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#dashActivity" type="button">Activity</button>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+          <!-- My Posts tab -->
+          <div class="tab-pane fade show active p-3" id="dashMyPosts">
+            <div id="myPostsList"></div>
+          </div>
+
+          <!-- Activity tab -->
+          <div class="tab-pane fade p-3" id="dashActivity">
+            <div id="activityLog"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Claim Item modal ── -->
+<div class="modal fade" id="claimModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Claim This Item</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="claimForm">
+        <div class="modal-body">
+          <input type="hidden" id="claimPostId">
+
+          <div class="mb-3" style="padding:12px 16px;background:var(--primary-light);border-radius:var(--radius-sm);font-size:.82rem;color:var(--primary)">
+            <strong>Claiming:</strong> <span id="claimItemName"></span>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-12 col-sm-6">
+              <label class="form-label">Full Name</label>
+              <input class="form-control" name="claimant_name" id="claimName" required>
+            </div>
+            <div class="col-12 col-sm-6">
+              <label class="form-label">Email</label>
+              <input class="form-control" name="claimant_email" id="claimEmail" type="email" required>
+            </div>
+          </div>
+
+          <div class="mt-2">
+            <label class="form-label">Phone (optional)</label>
+            <input class="form-control" name="claimant_phone" id="claimPhone" type="tel">
+          </div>
+
+          <div class="mt-2">
+            <label class="form-label">Why does this item belong to you?</label>
+            <textarea class="form-control" name="message" id="claimMessage" rows="3"
+              placeholder="Describe identifying features, when/where you lost it, or any proof of ownership…"></textarea>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label">Proof files (images or PDF, up to 3)</label>
+            <input type="file" class="form-control" name="proof" id="claimProofInput" multiple accept="image/*,.pdf">
+            <div style="font-size:.72rem;color:var(--muted);margin-top:4px">
+              e.g. purchase receipt, warranty card, ownership photos
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="claimSubmitBtn">
+            <span class="btn-text">Submit Claim</span>
+            <span class="spinner-border spinner-border-sm d-none" role="status" id="claimSpinner"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Claims Review modal ── -->
+<div class="modal fade" id="claimsReviewModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Incoming Claims</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="claimsReviewBody">
+        <!-- JS fills -->
       </div>
     </div>
   </div>

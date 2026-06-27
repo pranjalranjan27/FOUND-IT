@@ -25,6 +25,7 @@ const state = {
   categories: [],
   places: [],
   communities: [],
+  allPosts: [],
 };
 
 /* ── HTML escaping (XSS prevention) ──────────────────────────────── */
@@ -75,83 +76,185 @@ function timeAgo(dateStr) {
   return date.toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" });
 }
 
+/* ── Category emoji helper ───────────────────────────────────────── */
+
+const EMOJI_MAP = {
+  'Mobile':'📱','Laptop':'💻','Charger':'🔌','Book':'📚','ID Card':'🪪',
+  'Wallet':'👛','Keys':'🔑','Bag':'🎒','Earphones':'🎧','Power Bank':'🔋',
+  'Clothes':'👕'
+};
+
+function categoryEmoji(cat) {
+  return EMOJI_MAP[cat] || '📦';
+}
+
+/* ── Custom dropdown component ───────────────────────────────────── */
+
+class CustomSelect {
+  constructor(selectEl) {
+    this.select = selectEl;
+    this.select.style.display = 'none';
+
+    this.wrapper = document.createElement('div');
+    this.wrapper.className = 'custom-dropdown';
+    this.select.parentNode.insertBefore(this.wrapper, this.select);
+    this.wrapper.appendChild(this.select);
+
+    // Trigger button
+    this.trigger = document.createElement('button');
+    this.trigger.type = 'button';
+    this.trigger.className = 'custom-dropdown-trigger';
+    this.trigger.style.cursor = 'pointer';
+    this.trigger.innerHTML = `<span class="dd-label dd-placeholder">${this._placeholder()}</span><svg class="dd-chevron" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/></svg>`;
+    this.wrapper.insertBefore(this.trigger, this.select);
+
+    // Menu
+    this.menu = document.createElement('div');
+    this.menu.className = 'custom-dropdown-menu';
+    this.wrapper.appendChild(this.menu);
+
+    this._buildOptions();
+    this._bindEvents();
+    this._syncLabel();
+  }
+
+  _placeholder() {
+    const first = this.select.options[0];
+    return first && first.value === '' ? first.textContent : 'Select...';
+  }
+
+  _buildOptions() {
+    this.menu.innerHTML = '';
+    Array.from(this.select.options).forEach((opt, i) => {
+      const div = document.createElement('div');
+      div.className = 'custom-dropdown-option';
+      if (opt.value === this.select.value) div.classList.add('active');
+      div.textContent = opt.textContent;
+      div.dataset.value = opt.value;
+      div.dataset.index = i;
+      this.menu.appendChild(div);
+    });
+  }
+
+  _syncLabel() {
+    const label = this.trigger.querySelector('.dd-label');
+    const selected = this.select.options[this.select.selectedIndex];
+    if (selected && selected.value) {
+      label.textContent = selected.textContent;
+      label.classList.remove('dd-placeholder');
+    } else {
+      label.textContent = this._placeholder();
+      label.classList.add('dd-placeholder');
+    }
+  }
+
+  _bindEvents() {
+    this.trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Close other open dropdowns
+      document.querySelectorAll('.custom-dropdown.open').forEach(d => {
+        if (d !== this.wrapper) d.classList.remove('open');
+      });
+      this.wrapper.classList.toggle('open');
+    });
+
+    this.menu.addEventListener('click', (e) => {
+      const opt = e.target.closest('.custom-dropdown-option');
+      if (!opt) return;
+      this.select.value = opt.dataset.value;
+      this.select.dispatchEvent(new Event('change', { bubbles: true }));
+      this.menu.querySelectorAll('.custom-dropdown-option').forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+      this._syncLabel();
+      this.wrapper.classList.remove('open');
+    });
+
+    document.addEventListener('click', () => this.wrapper.classList.remove('open'));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') this.wrapper.classList.remove('open');
+    });
+  }
+
+  refresh() {
+    this._buildOptions();
+    this._syncLabel();
+  }
+
+  setValue(val) {
+    this.select.value = val;
+    this._buildOptions();
+    this._syncLabel();
+  }
+}
+
+const customSelects = {};
+
+function initCustomSelects() {
+  ['communitySelect', 'filterCategory', 'filterPlace', 'postCommunity', 'postCategory', 'postPlace'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !customSelects[id]) {
+      customSelects[id] = new CustomSelect(el);
+    }
+  });
+}
+
+function refreshCustomSelects() {
+  Object.values(customSelects).forEach(cs => cs.refresh());
+}
+
 /* ── Card rendering ──────────────────────────────────────────────── */
 
 function renderCard(p) {
   const isOwner = state.user && p.user_id === state.user.id;
   const isPending = p.status === "pending_delete";
 
-  let cardClasses = "card mb-3";
+  let cardClasses = "card";
   if (isPending) cardClasses += " card-pending";
   if (isOwner) cardClasses += " card-own";
 
-  // Images
-  let imagesHtml = "";
+  // Kind tag overlay
+  const kindTag = `<span class="card-kind-tag ${p.kind}">${p.kind === "found" ? "Found" : "Lost"}</span>`;
+
+  // Hero image
+  let heroHtml = "";
   if (p.images && p.images.length) {
-    const imgItems = p.images.map(img =>
-      `<div class="col-4 col-sm-4">
-        <img class="w-100 lightbox-trigger"
-             src="/uploads/${esc(img)}"
+    heroHtml = `
+      <div class="card-img-top-container">
+        ${kindTag}
+        <img class="card-img-top"
+             src="/uploads/${esc(p.images[0])}"
              alt="Photo of ${esc(p.item_name)}"
              loading="lazy">
-      </div>`
-    ).join("");
-    imagesHtml = `<div class="row image-grid g-2 mb-2">${imgItems}</div>`;
+      </div>`;
+  } else {
+    heroHtml = `
+      <div class="card-img-top-container">
+        ${kindTag}
+        <div class="card-img-placeholder">${categoryEmoji(p.category)}</div>
+      </div>`;
   }
 
-  // Community badge
-  const communityBadge = p.community
-    ? `<span class="badge badge-community">${esc(p.community)}</span>`
-    : "";
+  // Chips
+  let chipsHtml = `<div class="card-chips">
+    <span class="chip chip-category">${esc(p.category || "Other")}</span>
+    ${p.community ? `<span class="chip chip-community">${esc(p.community)}</span>` : ""}
+  </div>`;
 
-  // Owner actions
-  let ownerHtml = "";
-  if (isOwner) {
-    if (isPending) {
-      ownerHtml = `
-        <div class="mt-2 pt-2 border-top border-secondary border-opacity-50">
-          <div class="text-warning d-flex align-items-center gap-2">
-            <span class="spinner-border spinner-border-sm" role="status"></span>
-            Deleting in <span data-delete-eta="${p.delete_eta_ts || 0}"></span>&hellip;
-          </div>
-        </div>`;
-    } else {
-      const label = p.kind === "found" ? "Mark as Claimed" : "Mark as Found";
-      ownerHtml = `
-        <div class="mt-2 pt-2 border-top border-secondary border-opacity-50">
-          <div class="d-flex gap-2 align-items-center flex-wrap">
-            <button class="btn btn-outline-light btn-sm" onclick="handleDelete(${p.id})">${label}</button>
-          </div>
-          <div class="form-text muted mt-1">After confirmation, the post will auto-delete in 60 s.</div>
-        </div>`;
-    }
-  }
-
-  // Contact line
-  let contactParts = [`<strong>Contact:</strong> ${esc(p.name)}`];
-  if (p.phone) contactParts.push(`Phone: <a class="link-light" href="tel:${esc(p.phone)}">${esc(p.phone)}</a>`);
-  const contactLine = contactParts.join(" &middot; ");
+  // Meta row
+  let metaHtml = `<div class="card-meta">
+    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M12.166 8.94c-.524 1.062-1.234 2.12-1.96 3.07A32 32 0 0 1 8 14.58a32 32 0 0 1-2.206-2.57c-.726-.95-1.436-2.008-1.96-3.07C3.304 7.867 3 6.862 3 6a5 5 0 0 1 10 0c0 .862-.305 1.867-.834 2.94M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10"/><path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4m0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/></svg>
+    <span>${esc(p.place || "Other")}</span>
+    <span class="meta-dot"></span>
+    <time class="timeago" datetime="${esc(p.created_at)}">${esc(p.created_at)}</time>
+  </div>`;
 
   return `
-    <div class="${cardClasses}">
+    <div class="${cardClasses}" data-post-id="${p.id}">
+      ${heroHtml}
       <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start">
-          <h5 class="card-title mb-1">${esc(p.item_name)}</h5>
-          <div class="d-flex gap-2 flex-shrink-0 ms-2 flex-wrap">
-            <span class="badge ${p.kind === "found" ? "badge-found" : "badge-lost"}">${esc(p.kind.toUpperCase())}</span>
-            <span class="badge bg-secondary">${esc(p.category || "Other")}</span>
-            ${communityBadge}
-          </div>
-        </div>
-        ${p.description ? `<p class="muted mb-2">${esc(p.description)}</p>` : ""}
-        ${imagesHtml}
-        <div class="small muted">
-          ${contactLine}<br>
-          <strong>Location:</strong> ${esc(p.place || "Other")} &middot;
-          <strong>Posted:</strong>
-          <time class="timeago" datetime="${esc(p.created_at)}">${esc(p.created_at)}</time>
-        </div>
-        ${ownerHtml}
+        ${chipsHtml}
+        <div class="card-title">${esc(p.item_name)}</div>
+        ${metaHtml}
       </div>
     </div>`;
 }
@@ -159,7 +262,7 @@ function renderCard(p) {
 function renderEmptyState(kind) {
   if (kind === "found") {
     return `
-      <div class="empty-state">
+      <div class="empty-state" style="grid-column:1/-1">
         <div class="empty-icon">📦</div>
         <h5>No found items posted yet</h5>
         <p>Found something in your community? Post it here to help reunite it with its owner.</p>
@@ -167,7 +270,7 @@ function renderEmptyState(kind) {
       </div>`;
   }
   return `
-    <div class="empty-state">
+    <div class="empty-state" style="grid-column:1/-1">
       <div class="empty-icon">🔍</div>
       <h5>No lost items reported</h5>
       <p>Lost something? Post the details and someone in your community might have found it.</p>
@@ -175,20 +278,335 @@ function renderEmptyState(kind) {
     </div>`;
 }
 
+/* ── Item detail modal ───────────────────────────────────────────── */
+
+function openItemDetail(postId) {
+  const post = state.allPosts.find(p => p.id === postId);
+  if (!post) return;
+
+  const isOwner = state.user && post.user_id === state.user.id;
+  const isPending = post.status === "pending_delete";
+  const p = post;
+
+  // Hero image
+  let heroHtml = "";
+  if (p.images && p.images.length) {
+    heroHtml = `<img class="detail-hero lightbox-trigger" src="/uploads/${esc(p.images[0])}" alt="${esc(p.item_name)}">`;
+  } else {
+    heroHtml = `<div class="detail-hero-placeholder">${categoryEmoji(p.category)}</div>`;
+  }
+
+  // Extra images thumbnails
+  let thumbsHtml = "";
+  if (p.images && p.images.length > 1) {
+    const thumbs = p.images.map((img, i) => `
+      <img class="lightbox-trigger${i === 0 ? ' active' : ''}"
+           src="/uploads/${esc(img)}" alt="Photo ${i+1}"
+           onclick="document.querySelector('.detail-hero').src=this.src">`
+    ).join("");
+    thumbsHtml = `<div class="detail-images-row">${thumbs}</div>`;
+  }
+
+  // Contact section
+  let contactHtml = "";
+  if (p.name) {
+    const initial = p.name.charAt(0).toUpperCase();
+    contactHtml = `
+      <div class="detail-contact">
+        <div class="detail-contact-avatar">${esc(initial)}</div>
+        <div class="detail-contact-info">
+          <div class="detail-contact-name">${esc(p.name)}</div>
+          ${p.phone ? `<div class="detail-contact-phone"><a href="tel:${esc(p.phone)}">${esc(p.phone)}</a></div>` : '<div style="font-size:.82rem;color:var(--muted)">No phone provided</div>'}
+        </div>
+      </div>`;
+  }
+
+  // Owner actions
+  let ownerHtml = "";
+  if (isOwner) {
+    if (isPending) {
+      ownerHtml = `
+        <div class="detail-owner-actions">
+          <div class="d-flex align-items-center gap-2" style="color:#b45309">
+            <span class="spinner-border spinner-border-sm"></span>
+            Deleting in <span data-delete-eta="${p.delete_eta_ts || 0}"></span>&hellip;
+          </div>
+        </div>`;
+    } else {
+      const label = p.kind === "found" ? "Mark as Claimed" : "Mark as Found";
+      ownerHtml = `
+        <div class="detail-owner-actions">
+          <button class="btn btn-outline-danger btn-sm" onclick="handleDelete(${p.id}); bootstrap.Modal.getInstance(document.getElementById('itemDetailModal')).hide();">${label}</button>
+          <span style="font-size:.72rem;color:var(--muted)">Post will auto-delete in 60s</span>
+        </div>`;
+    }
+  }
+
+  // Claim button — only for signed-in non-owners on active items
+  let claimHtml = "";
+  if (state.user && !isOwner && p.status === "active") {
+    claimHtml = `
+      <div class="detail-owner-actions">
+        <button class="btn btn-primary btn-sm" onclick="openClaimModal(${p.id}, '${esc(p.item_name).replace(/'/g, "\\'")}')">🤚 Claim This Item</button>
+        <span style="font-size:.72rem;color:var(--muted)">Submit proof that this belongs to you</span>
+      </div>`;
+  } else if (p.status === "resolved") {
+    claimHtml = `
+      <div class="detail-owner-actions">
+        <span class="claim-status claim-status-approved">✅ Resolved — Item has been claimed</span>
+      </div>`;
+  }
+
+  const bodyHtml = `
+    ${heroHtml}
+    ${thumbsHtml}
+    <div class="detail-content">
+      <span class="detail-kind-tag ${p.kind}">${p.kind === "found" ? "📦 Found Item" : "🔍 Lost Item"}</span>
+      <h3 class="detail-title">${esc(p.item_name)}</h3>
+
+      <div class="detail-grid">
+        <div class="detail-field">
+          <span class="detail-field-label">Category</span>
+          <span class="detail-field-value">${categoryEmoji(p.category)} ${esc(p.category || "Other")}</span>
+        </div>
+        <div class="detail-field">
+          <span class="detail-field-label">Location</span>
+          <span class="detail-field-value">📍 ${esc(p.place || "Other")}</span>
+        </div>
+        <div class="detail-field">
+          <span class="detail-field-label">Community</span>
+          <span class="detail-field-value">${esc(p.community || "Not specified")}</span>
+        </div>
+        <div class="detail-field">
+          <span class="detail-field-label">Posted</span>
+          <span class="detail-field-value">${timeAgo(p.created_at)}</span>
+        </div>
+      </div>
+
+      ${p.description ? `<div class="detail-description">${esc(p.description)}</div>` : ""}
+
+      <div style="font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Posted by</div>
+      ${contactHtml}
+    </div>
+    ${ownerHtml}
+    ${claimHtml}`;
+
+  document.getElementById("detailModalBody").innerHTML = bodyHtml;
+  document.getElementById("detailModalTitle").textContent = p.item_name;
+
+  new bootstrap.Modal(document.getElementById("itemDetailModal")).show();
+
+  // Setup countdowns in detail modal
+  setupCountdowns();
+}
+
 /* ── Navbar rendering ────────────────────────────────────────────── */
 
 function renderNavbar() {
   const nav = document.getElementById("navAuth");
   if (state.user) {
+    const initial = (state.user.name || state.user.email || "U").charAt(0).toUpperCase();
     nav.innerHTML = `
-      <span class="me-2 d-none d-md-inline text-secondary-custom">${esc(state.user.name)}</span>
-      <button class="btn btn-outline-light btn-sm" id="logoutBtn">Sign Out</button>`;
+      <div class="user-dropdown">
+        <div class="user-dropdown-toggle" id="userDropdownToggle">
+          <div class="user-avatar">${esc(initial)}</div>
+          <span class="user-name d-none d-md-inline">${esc(state.user.name || state.user.email)}</span>
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/></svg>
+        </div>
+        <div class="user-dropdown-menu" id="userDropdownMenu">
+          <div class="user-dropdown-header">
+            <div style="font-weight:600;color:var(--text)">${esc(state.user.name || 'User')}</div>
+            <div style="font-size:.76rem;color:var(--muted);margin-top:2px">${esc(state.user.email || '')}</div>
+          </div>
+          <button class="user-dropdown-item" id="myPostsBtn">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm15 0a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1zM3 4h10v1H3zm0 3h10v1H3zm0 3h7v1H3z"/></svg>
+            My Posts
+          </button>
+          <button class="user-dropdown-item" id="myClaimsBtn">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2zm6.5 4.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3a.5.5 0 0 1 1 0"/></svg>
+            My Claims
+          </button>
+          <div class="user-dropdown-divider"></div>
+          <button class="user-dropdown-item text-danger" id="logoutBtn">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0z"/><path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708z"/></svg>
+            Logout
+          </button>
+        </div>
+      </div>`;
+
+    // Toggle dropdown
+    const toggle = document.getElementById("userDropdownToggle");
+    const menu = document.getElementById("userDropdownMenu");
+    toggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      menu.classList.toggle("show");
+    });
+    document.addEventListener("click", () => menu.classList.remove("show"));
+
+    document.getElementById("myPostsBtn").addEventListener("click", () => {
+      menu.classList.remove("show");
+      openMyPosts();
+    });
+    document.getElementById("myClaimsBtn").addEventListener("click", () => {
+      menu.classList.remove("show");
+      openClaimsReview();
+    });
     document.getElementById("logoutBtn").addEventListener("click", handleLogout);
   } else {
     nav.innerHTML = `<button class="btn btn-primary btn-sm" id="openLogin">Sign In</button>`;
     document.getElementById("openLogin").addEventListener("click", () => {
       new bootstrap.Modal(document.getElementById("authModal")).show();
     });
+  }
+}
+
+/* ── My Posts dashboard ───────────────────────────────────────── */
+
+async function openMyPosts() {
+  const modal = new bootstrap.Modal(document.getElementById("myPostsModal"));
+  const listEl = document.getElementById("myPostsList");
+  const actEl = document.getElementById("activityLog");
+
+  listEl.innerHTML = '<div class="text-center p-4"><span class="spinner-border spinner-border-sm"></span> Loading…</div>';
+  actEl.innerHTML = '';
+  modal.show();
+
+  const res = await api("/api/posts/mine");
+  if (!res.ok) {
+    listEl.innerHTML = '<div class="my-posts-empty"><p>Could not load posts.</p></div>';
+    return;
+  }
+
+  const posts = res.data.posts;
+  if (!posts.length) {
+    listEl.innerHTML = `
+      <div class="my-posts-empty">
+        <div class="empty-icon">📫</div>
+        <h5>No posts yet</h5>
+        <p>Your found and lost item posts will appear here.</p>
+      </div>`;
+    actEl.innerHTML = `
+      <div class="my-posts-empty">
+        <div class="empty-icon">💭</div>
+        <h5>No activity yet</h5>
+        <p>Your activity timeline will appear here once you start posting.</p>
+      </div>`;
+    return;
+  }
+
+  const foundPosts = posts.filter(p => p.kind === "found");
+  const lostPosts = posts.filter(p => p.kind === "lost");
+
+  listEl.innerHTML = renderMyPostsSection("Found Items", foundPosts, "📦") +
+                     renderMyPostsSection("Lost Items", lostPosts, "🔍");
+
+  actEl.innerHTML = renderActivityLog(posts);
+
+  // Attach status change listeners
+  listEl.querySelectorAll("[data-status-action]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const postId = btn.getAttribute("data-post-id");
+      const newStatus = btn.getAttribute("data-status-action");
+      await handleStatusChange(postId, newStatus);
+    });
+  });
+}
+
+function renderMyPostsSection(title, posts, emoji) {
+  if (!posts.length) return '';
+  const rows = posts.map(p => renderMyPostRow(p)).join('');
+  return `<div class="mb-3">
+    <div style="font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">${emoji} ${esc(title)} (${posts.length})</div>
+    ${rows}
+  </div>`;
+}
+
+function renderMyPostRow(p) {
+  let thumb = '';
+  if (p.images && p.images.length) {
+    thumb = `<img class="my-post-thumb" src="/uploads/${esc(p.images[0])}" alt="${esc(p.item_name)}">`;
+  } else {
+    thumb = `<div class="my-post-thumb-placeholder">${categoryEmoji(p.category)}</div>`;
+  }
+
+  const statusLabel = p.status === 'pending_delete' ? 'Deleting' : p.status;
+  const statusBadge = `<span class="status-badge status-${esc(p.status)}">${esc(statusLabel)}</span>`;
+
+  let actions = '';
+  if (p.status === 'active') {
+    actions = `<button class="btn-status" data-post-id="${p.id}" data-status-action="claimed">Mark Claimed</button>`;
+  } else if (p.status === 'claimed') {
+    actions = `<button class="btn-status" data-post-id="${p.id}" data-status-action="resolved">✓ Resolve</button>`;
+  }
+
+  return `
+    <div class="my-post-row">
+      ${thumb}
+      <div class="my-post-info">
+        <div class="my-post-title">${esc(p.item_name)}</div>
+        <div class="my-post-meta">
+          ${statusBadge}
+          <span>·</span>
+          <span>${esc(p.community || 'No community')}</span>
+          <span>·</span>
+          <span>${timeAgo(p.created_at)}</span>
+        </div>
+      </div>
+      <div class="my-post-actions">${actions}</div>
+    </div>`;
+}
+
+function renderActivityLog(posts) {
+  const activities = posts.map(p => {
+    const entries = [];
+    entries.push({
+      type: p.kind,
+      icon: p.kind === 'found' ? '📦' : '🔍',
+      iconClass: p.kind === 'found' ? 'activity-icon-found' : 'activity-icon-lost',
+      title: `Posted ${p.kind} item: <strong>${esc(p.item_name)}</strong>`,
+      time: p.created_at,
+    });
+    if (p.status === 'claimed') {
+      entries.push({ type:'status', icon:'📩', iconClass:'activity-icon-status',
+        title:`<strong>${esc(p.item_name)}</strong> marked as claimed`, time:p.created_at });
+    } else if (p.status === 'resolved') {
+      entries.push({ type:'status', icon:'✅', iconClass:'activity-icon-status',
+        title:`<strong>${esc(p.item_name)}</strong> resolved`, time:p.created_at });
+    } else if (p.status === 'pending_delete') {
+      entries.push({ type:'delete', icon:'🗑️', iconClass:'activity-icon-delete',
+        title:`<strong>${esc(p.item_name)}</strong> deletion started`, time:p.created_at });
+    }
+    return entries;
+  }).flat();
+
+  activities.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+  if (!activities.length) {
+    return `<div class="my-posts-empty"><div class="empty-icon">💭</div><h5>No activity</h5></div>`;
+  }
+
+  return activities.map(a => `
+    <div class="activity-row">
+      <div class="activity-icon ${a.iconClass}">${a.icon}</div>
+      <div class="activity-content">
+        <div class="activity-title">${a.title}</div>
+        <div class="activity-time">${timeAgo(a.time)}</div>
+      </div>
+      <div class="activity-arrow">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/></svg>
+      </div>
+    </div>`
+  ).join('');
+}
+
+async function handleStatusChange(postId, newStatus) {
+  const res = await api(`/api/posts/${postId}/status`, { json: { status: newStatus } });
+  if (res.ok) {
+    showToast(`Post marked as ${newStatus}.`, "success");
+    openMyPosts();
+    loadPosts();
+  } else {
+    showToast(res.error || "Could not update status.", "error");
   }
 }
 
@@ -233,6 +651,9 @@ function populateSelects() {
       sel.appendChild(opt);
     });
   });
+
+  // Refresh custom dropdowns after options change
+  refreshCustomSelects();
 }
 
 /* ── URL state management (history.pushState) ────────────────────── */
@@ -278,6 +699,9 @@ async function loadPosts() {
   const foundPosts = foundRes.ok ? foundRes.data.posts : [];
   const lostPosts = lostRes.ok ? lostRes.data.posts : [];
 
+  // Store all posts for detail modal lookups
+  state.allPosts = [...foundPosts, ...lostPosts];
+
   // Render found cards
   const foundContainer = document.getElementById("foundCards");
   foundContainer.innerHTML = foundPosts.length
@@ -313,6 +737,15 @@ async function loadPosts() {
 
 /* ── Auth handlers ───────────────────────────────────────────────── */
 
+function resetAuthForms() {
+  const loginForm = document.getElementById('loginForm');
+  const registerForm = document.getElementById('registerForm');
+  if (loginForm) loginForm.reset();
+  if (registerForm) registerForm.reset();
+  const err = document.getElementById('authError');
+  if (err) err.classList.add('d-none');
+}
+
 async function handleLogin(e) {
   e.preventDefault();
   const form = e.target;
@@ -323,6 +756,7 @@ async function handleLogin(e) {
 
   if (res.ok) {
     state.user = res.data.user;
+    resetAuthForms();
     bootstrap.Modal.getInstance(document.getElementById("authModal"))?.hide();
     renderNavbar();
     showToast("Signed in successfully.", "success");
@@ -349,6 +783,7 @@ async function handleRegister(e) {
 
   if (res.ok) {
     state.user = res.data.user;
+    resetAuthForms();
     bootstrap.Modal.getInstance(document.getElementById("authModal"))?.hide();
     renderNavbar();
     showToast("Account created. Welcome!", "success");
@@ -362,8 +797,12 @@ async function handleRegister(e) {
 }
 
 async function handleLogout() {
-  await api("/api/auth/logout", { method: "POST" });
+  await Promise.all([
+    api("/auth/logout", { method: "POST" }),
+    api("/api/auth/logout", { method: "POST" }),
+  ]);
   state.user = null;
+  resetAuthForms();
   renderNavbar();
   showToast("Signed out.", "success");
   loadPosts();
@@ -429,7 +868,6 @@ async function handlePostSubmit(e) {
     }
   }
 
-  // Show spinner
   const btnText = document.querySelector("#postSubmitBtn .btn-text");
   const spinner = document.getElementById("postSpinner");
   if (btnText) btnText.textContent = "Posting…";
@@ -485,7 +923,6 @@ function setupSearch() {
   const hiddenPlace = document.getElementById("hiddenPlace");
   const communitySelect = document.getElementById("communitySelect");
 
-  // Restore from URL on initial load
   const { q, cat, place, community } = getSearchParams();
   if (q) input.value = q;
   if (cat) hiddenCat.value = cat;
@@ -505,7 +942,6 @@ function setupSearch() {
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
   communitySelect.addEventListener("change", doSearch);
 
-  // Back/forward navigation
   window.addEventListener("popstate", () => {
     const p = getSearchParams();
     input.value = p.q;
@@ -530,6 +966,8 @@ function setupFilters() {
   btn.addEventListener("click", () => {
     selCat.value = hiddenCat.value || "";
     selPlace.value = hiddenPlace.value || "";
+    if (customSelects.filterCategory) customSelects.filterCategory.refresh();
+    if (customSelects.filterPlace) customSelects.filterPlace.refresh();
     modal.show();
   });
 
@@ -538,6 +976,8 @@ function setupFilters() {
     hiddenPlace.value = "";
     selCat.value = "";
     selPlace.value = "";
+    if (customSelects.filterCategory) customSelects.filterCategory.refresh();
+    if (customSelects.filterPlace) customSelects.filterPlace.refresh();
   });
 
   document.getElementById("filtersApply").addEventListener("click", () => {
@@ -621,54 +1061,256 @@ function setupLightbox() {
   document.addEventListener("click", (e) => {
     const trigger = e.target.closest(".lightbox-trigger");
     if (!trigger) return;
+    e.stopPropagation();
     modalImg.src = trigger.src;
     modalImg.alt = trigger.alt;
     modal.show();
   });
 }
 
+/* ── Card click → detail modal (delegated) ───────────────────────── */
+
+function setupCardClicks() {
+  document.addEventListener("click", (e) => {
+    // Don't open detail modal if clicking a button, link, lightbox trigger, etc.
+    if (e.target.closest("button, a, .lightbox-trigger, .remove-preview")) return;
+
+    const card = e.target.closest(".card[data-post-id]");
+    if (!card) return;
+
+    const postId = parseInt(card.getAttribute("data-post-id"), 10);
+    if (postId) openItemDetail(postId);
+  });
+}
+
+/* ── Mobile FAB ──────────────────────────────────────────────────── */
+
+function setupMobileFab() {
+  const fab = document.getElementById("mobileFab");
+  if (!fab) return;
+
+  fab.addEventListener("click", () => {
+    const lostTab = document.getElementById("lost-tab");
+    const isLostActive = lostTab && lostTab.classList.contains("active");
+    openPostModal(isLostActive ? "lost" : "found");
+  });
+}
+
+/* ── Claim workflow ──────────────────────────────────────────────── */
+
+function openClaimModal(postId, itemName) {
+  // Close the detail modal first
+  const detailModal = bootstrap.Modal.getInstance(document.getElementById('itemDetailModal'));
+  if (detailModal) detailModal.hide();
+
+  document.getElementById('claimPostId').value = postId;
+  document.getElementById('claimItemName').textContent = itemName;
+  document.getElementById('claimForm').reset();
+
+  // Pre-fill with user info
+  if (state.user) {
+    const nameEl = document.getElementById('claimName');
+    const emailEl = document.getElementById('claimEmail');
+    if (nameEl && !nameEl.value) nameEl.value = state.user.name || '';
+    if (emailEl && !emailEl.value) emailEl.value = state.user.email || '';
+  }
+
+  setTimeout(() => {
+    new bootstrap.Modal(document.getElementById('claimModal')).show();
+  }, 300);
+}
+window.openClaimModal = openClaimModal;
+
+async function handleClaimSubmit(e) {
+  e.preventDefault();
+
+  const postId = document.getElementById('claimPostId').value;
+  const formData = new FormData(document.getElementById('claimForm'));
+
+  const btnText = document.querySelector('#claimSubmitBtn .btn-text');
+  const spinner = document.getElementById('claimSpinner');
+  if (btnText) btnText.textContent = 'Submitting…';
+  if (spinner) spinner.classList.remove('d-none');
+
+  try {
+    const res = await fetch(`/api/posts/${postId}/claim`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: formData,
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+      bootstrap.Modal.getInstance(document.getElementById('claimModal'))?.hide();
+      showToast('Claim submitted! The poster will review your request.', 'success');
+    } else {
+      showToast(data.error || 'Could not submit claim.', 'error');
+    }
+  } catch (err) {
+    showToast('Network error. Please try again.', 'error');
+  } finally {
+    if (btnText) btnText.textContent = 'Submit Claim';
+    if (spinner) spinner.classList.add('d-none');
+  }
+}
+
+async function openClaimsReview() {
+  const bodyEl = document.getElementById('claimsReviewBody');
+  bodyEl.innerHTML = '<div class="text-center p-4"><span class="spinner-border spinner-border-sm"></span> Loading…</div>';
+
+  new bootstrap.Modal(document.getElementById('claimsReviewModal')).show();
+
+  const res = await api('/api/claims/mine');
+  if (!res.ok) {
+    bodyEl.innerHTML = '<div class="my-posts-empty"><p>Could not load claims.</p></div>';
+    return;
+  }
+
+  const claims = res.data.claims;
+  if (!claims.length) {
+    bodyEl.innerHTML = `
+      <div class="my-posts-empty">
+        <div class="empty-icon">📫</div>
+        <h5>No claims yet</h5>
+        <p>When someone submits a claim on one of your posts, it will appear here.</p>
+      </div>`;
+    return;
+  }
+
+  bodyEl.innerHTML = claims.map(c => {
+    const proofHtml = c.files.length ? `
+      <div class="claim-proof-row">
+        ${c.files.map(f => {
+          const isPdf = f.original_name && f.original_name.toLowerCase().endsWith('.pdf');
+          const icon = isPdf
+            ? '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5z"/></svg>'
+            : '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/><path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1z"/></svg>';
+          return `<a href="/uploads/${esc(f.filename)}" target="_blank" class="claim-proof-item">${icon} ${esc(f.original_name || f.filename)}</a>`;
+        }).join('')}
+      </div>` : '';
+
+    let actionsHtml = '';
+    if (c.status === 'pending') {
+      actionsHtml = `
+        <div class="claim-actions">
+          <button class="btn btn-primary btn-sm" onclick="handleClaimAction(${c.id}, 'approve')">Approve</button>
+          <button class="btn btn-outline-danger btn-sm" onclick="handleClaimAction(${c.id}, 'reject')">Reject</button>
+        </div>`;
+    }
+
+    return `
+      <div class="claim-card">
+        <div class="claim-card-header">
+          <div>
+            <div class="claim-card-item">${categoryEmoji(c.item_category)} ${esc(c.item_name)}</div>
+            <div class="claim-card-time">${timeAgo(c.created_at)}</div>
+          </div>
+          <span class="claim-status claim-status-${esc(c.status)}">${esc(c.status)}</span>
+        </div>
+        <div class="claim-info-row">
+          <span><strong>From:</strong> ${esc(c.claimant_name)}</span>
+          <span><strong>Email:</strong> ${esc(c.claimant_email)}</span>
+          ${c.claimant_phone ? `<span><strong>Phone:</strong> ${esc(c.claimant_phone)}</span>` : ''}
+        </div>
+        ${c.message ? `<div class="claim-message">${esc(c.message)}</div>` : ''}
+        ${proofHtml}
+        ${actionsHtml}
+      </div>`;
+  }).join('');
+}
+
+async function handleClaimAction(claimId, action) {
+  const confirmMsg = action === 'approve'
+    ? 'Approve this claim? The item will be marked as resolved.'
+    : 'Reject this claim?';
+  if (!confirm(confirmMsg)) return;
+
+  const res = await api(`/api/claims/${claimId}/${action}`, { method: 'POST' });
+  if (res.ok) {
+    const msg = action === 'approve'
+      ? 'Claim approved! Item marked as resolved.'
+      : 'Claim rejected.';
+    showToast(msg, 'success');
+    openClaimsReview();
+    loadPosts();
+  } else {
+    showToast(res.error || `Could not ${action} claim.`, 'error');
+  }
+}
+window.handleClaimAction = handleClaimAction;
+
 /* ── Bootstrap everything on DOM ready ───────────────────────────── */
 
 document.addEventListener("DOMContentLoaded", async () => {
-  // 1. Load session and meta in parallel
-  const [sessionRes, metaRes] = await Promise.all([
-    api("/api/auth/session"),
-    api("/api/meta"),
-  ]);
-
-  if (sessionRes.ok) state.user = sessionRes.data.user;
+  // 1. Load meta data
+  const metaRes = await api("/api/meta");
   if (metaRes.ok) {
     state.categories = metaRes.data.categories;
     state.places = metaRes.data.places;
     state.communities = metaRes.data.communities;
   }
 
-  // 2. Render initial UI
+  // 2. Detect auth — check Google OAuth first, then fall back to dev session
+  const googleRes = await api("/auth/user");
+  if (googleRes.authenticated && googleRes.user) {
+    state.user = googleRes.user;
+  } else {
+    const sessionRes = await api("/api/auth/session");
+    if (sessionRes.ok && sessionRes.data.user) {
+      state.user = sessionRes.data.user;
+    }
+  }
+
+  // 3. Render initial UI
   renderNavbar();
   populateSelects();
 
-  // 3. Restore filters from URL
-  const { cat, place, community } = getSearchParams();
-  if (cat) document.getElementById("filterCategory").value = cat;
-  if (place) document.getElementById("filterPlace").value = place;
-  if (community) document.getElementById("communitySelect").value = community;
+  // 4. Initialize custom dropdowns (after options are populated)
+  initCustomSelects();
 
-  // 4. Load posts
+  // 5. Restore filters from URL
+  const { cat, place, community } = getSearchParams();
+  if (cat) {
+    document.getElementById("filterCategory").value = cat;
+    if (customSelects.filterCategory) customSelects.filterCategory.refresh();
+  }
+  if (place) {
+    document.getElementById("filterPlace").value = place;
+    if (customSelects.filterPlace) customSelects.filterPlace.refresh();
+  }
+  if (community) {
+    document.getElementById("communitySelect").value = community;
+    if (customSelects.communitySelect) customSelects.communitySelect.refresh();
+  }
+
+  // 6. Load posts
   await loadPosts();
 
-  // 5. Setup interactions
+  // 7. Setup interactions
   setupSearch();
   setupFilters();
   setupImagePreview();
   setupLightbox();
+  setupCardClicks();
+  setupMobileFab();
 
-  // 6. Form handlers
+  // 8. Form handlers
   document.getElementById("loginForm").addEventListener("submit", handleLogin);
   document.getElementById("registerForm").addEventListener("submit", handleRegister);
   document.getElementById("postForm").addEventListener("submit", handlePostSubmit);
+  document.getElementById("claimForm").addEventListener("submit", handleClaimSubmit);
 
-  // 7. Clear auth error when modal opens
-  document.getElementById("authModal").addEventListener("show.bs.modal", () => {
-    document.getElementById("authError").classList.add("d-none");
+  // 9. Reset auth forms on modal open, close, and tab switch
+  const authModalEl = document.getElementById("authModal");
+  authModalEl.addEventListener("show.bs.modal", () => {
+    resetAuthForms();
+  });
+  authModalEl.addEventListener("hidden.bs.modal", () => {
+    resetAuthForms();
+  });
+  document.querySelectorAll('#authTabs button[data-bs-toggle="tab"]').forEach(tab => {
+    tab.addEventListener('shown.bs.tab', () => {
+      resetAuthForms();
+    });
   });
 });
