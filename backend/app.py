@@ -34,7 +34,7 @@ from .config import (
     GOOGLE_CLIENT_SECRET,
     SESSION_TYPE,
 )
-from .database import get_db, close_db, init_db, cleanup_stale_deletes, reset_old_users, adapt_query, get_cursor, _connect
+from .database import get_db, close_db, init_db, cleanup_stale_deletes, adapt_query, get_cursor, _connect
 
 
 def create_app():
@@ -75,7 +75,6 @@ def create_app():
     with app.app_context():
         init_db()
         cleanup_stale_deletes()
-        reset_old_users()
 
     # ── Frontend serving ─────────────────────────────────────────────
 

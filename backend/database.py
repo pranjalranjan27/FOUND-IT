@@ -301,7 +301,8 @@ def cleanup_stale_deletes():
         conn.commit()
     conn.close()
 
-
+# DEV ONLY: Do not call this in production startup.
+# Deleting users with existing posts violates foreign key constraints.
 def reset_old_users():
     """Clear all old test/dev user accounts on startup."""
     conn = _connect()
