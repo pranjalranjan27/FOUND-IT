@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="frontend/images/logo.png" width="560" alt="Found IT Logo"/>
-
 # Found IT
 
 ### 🔍 Reuniting People. Together.
