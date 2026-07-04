@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="frontend/images/logo.png" width="180" alt="Found IT Logo"/>
+<img src="frontend/images/logo.png" width="560" alt="Found IT Logo"/>
 
 # Found IT
 
