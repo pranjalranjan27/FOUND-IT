@@ -128,11 +128,18 @@ def init_db():
                 name TEXT NOT NULL,
                 phone TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
-                delete_at TEXT,
                 created_at TEXT NOT NULL
             )
             """
         )
+
+        # Safe migration: remove delete_at column if it exists
+        cur.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'posts' AND column_name = 'delete_at'
+        """)
+        if cur.fetchone():
+            cur.execute("ALTER TABLE posts DROP COLUMN delete_at")
 
         cur.execute(
             """
@@ -171,6 +178,53 @@ def init_db():
             """
         )
 
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id SERIAL PRIMARY KEY,
+                post_id INTEGER NOT NULL,
+                actor_user_id INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                metadata TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS activity_logs (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                message TEXT NOT NULL,
+                metadata TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS contact_requests (
+                id SERIAL PRIMARY KEY,
+                claim_id INTEGER NOT NULL REFERENCES claims(id),
+                requested_by INTEGER NOT NULL,
+                requested_to INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
+        # Safe migration: add request_type column to claims if missing
+        cur.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'claims' AND column_name = 'request_type'
+        """)
+        if not cur.fetchone():
+            cur.execute("ALTER TABLE claims ADD COLUMN request_type TEXT DEFAULT 'claim'")
+
         conn.commit()
         cur.close()
         conn.close()
@@ -207,7 +261,6 @@ def init_db():
                 name TEXT NOT NULL,
                 phone TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
-                delete_at TEXT,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(user_id) REFERENCES users(id)
             )
@@ -265,69 +318,50 @@ def init_db():
             """
         )
 
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                post_id INTEGER NOT NULL,
+                actor_user_id INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                metadata TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS activity_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                message TEXT NOT NULL,
+                metadata TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS contact_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                claim_id INTEGER NOT NULL,
+                requested_by INTEGER NOT NULL,
+                requested_to INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(claim_id) REFERENCES claims(id)
+            )
+            """
+        )
+
+        # Safe migration: add request_type column to claims if missing
+        claim_cols = [r[1] for r in cur.execute("PRAGMA table_info(claims)").fetchall()]
+        if "request_type" not in claim_cols:
+            cur.execute("ALTER TABLE claims ADD COLUMN request_type TEXT DEFAULT 'claim'")
+
         conn.commit()
         conn.close()
-
-
-# ── Startup maintenance ──────────────────────────────────────────────
-
-def cleanup_stale_deletes():
-    """Remove posts stuck in pending_delete past their delete_at time."""
-    conn = _connect()
-    now = datetime.now(timezone.utc).isoformat()
-
-    if IS_POSTGRES:
-        cur = _pg_cursor(conn)
-        cur.execute(
-            "SELECT id FROM posts WHERE status = 'pending_delete' AND delete_at <= %s",
-            (now,),
-        )
-        stale = cur.fetchall()
-        for post in stale:
-            _delete_post_files(conn, post["id"])
-            cur.execute("DELETE FROM images WHERE post_id = %s", (post["id"],))
-            cur.execute("DELETE FROM posts WHERE id = %s", (post["id"],))
-    else:
-        stale = conn.execute(
-            "SELECT id FROM posts WHERE status = 'pending_delete' AND delete_at <= ?",
-            (now,),
-        ).fetchall()
-        for post in stale:
-            _delete_post_files(conn, post["id"])
-            conn.execute("DELETE FROM images WHERE post_id = ?", (post["id"],))
-            conn.execute("DELETE FROM posts WHERE id = ?", (post["id"],))
-
-    if stale:
-        conn.commit()
-    conn.close()
-
-# DEV ONLY: Do not call this in production startup.
-# Deleting users with existing posts violates foreign key constraints.
-def reset_old_users():
-    """Clear all old test/dev user accounts on startup."""
-    conn = _connect()
-    if IS_POSTGRES:
-        cur = _pg_cursor(conn)
-        cur.execute("DELETE FROM users")
-        cur.close()
-    else:
-        conn.execute("DELETE FROM users")
-    conn.commit()
-    conn.close()
-
-
-def _delete_post_files(conn, post_id):
-    """Remove uploaded image files for a post."""
-    if IS_POSTGRES:
-        cur = _pg_cursor(conn)
-        cur.execute("SELECT filename FROM images WHERE post_id = %s", (post_id,))
-        imgs = cur.fetchall()
-    else:
-        imgs = conn.execute(
-            "SELECT filename FROM images WHERE post_id = ?", (post_id,)
-        ).fetchall()
-    for img in imgs:
-        try:
-            (UPLOAD_DIR / img["filename"]).unlink(missing_ok=True)
-        except Exception:
-            pass

@@ -26,13 +26,21 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# If DATABASE_URL is set (production / Supabase), use PostgreSQL.
-# Otherwise fall back to the local SQLite file.
+# If DATABASE_URL is set (production / Supabase) AND psycopg2 is installed,
+# use PostgreSQL.  Otherwise fall back to the local SQLite file.
+# This allows local dev with .env containing DATABASE_URL but without
+# psycopg2 installed — the app simply uses SQLite instead.
 if DATABASE_URL:
-    # Render sometimes provides postgres:// which psycopg2 needs as postgresql://
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    IS_POSTGRES = True
+    try:
+        import psycopg2  # noqa: F401 — availability check only
+        # Render sometimes provides postgres:// which psycopg2 needs as postgresql://
+        if DATABASE_URL.startswith("postgres://"):
+            DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        IS_POSTGRES = True
+    except ImportError:
+        # psycopg2 not installed → fall back to SQLite for local dev
+        DATABASE_URI = INSTANCE_DIR / "foundit.db"
+        IS_POSTGRES = False
 else:
     DATABASE_URI = INSTANCE_DIR / "foundit.db"
     IS_POSTGRES = False
@@ -44,10 +52,6 @@ CLAIM_ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "pdf"}
 MAX_UPLOAD_FILES = 3
 MAX_CLAIM_FILES = 3
 MAX_CONTENT_MB = 8
-
-# ── Post deletion ───────────────────────────────────────────────────
-
-DELETE_DELAY_SECONDS = 60
 
 # ── Domain data ──────────────────────────────────────────────────────
 

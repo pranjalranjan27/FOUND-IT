@@ -1,232 +1,169 @@
-# 🧭 Found IT
+<div align="center">
 
-**Found IT** is a **community-based Lost & Found platform** with a separated frontend/backend architecture.  
-Post items you've *found* or *lost* in your community — campus, apartment complex, office, or any group — to help reunite belongings with their owners.
+<img src="frontend/images/logo.png" width="180" alt="Found IT Logo"/>
 
----
+# Found IT
 
-## 🏗️ Architecture
+### 🔍 Reuniting People. Together.
 
-```
-Browser (static HTML/JS/CSS)
-        ↕  fetch()
-Flask REST API (JSON responses)
-        ↕
-SQLite Database
-```
+*A modern community-powered Lost & Found platform built with Flask, PostgreSQL, and Google OAuth.*
 
-The frontend is a **static client** — pure HTML, CSS, and vanilla JavaScript.  
-The backend is a **Flask REST API** — no Jinja templates, only JSON endpoints.  
-Both are served from a single `python run.py` command.
+<br>
 
----
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-3.x-000000?style=for-the-badge&logo=flask)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-336791?style=for-the-badge&logo=postgresql)
+![SQLite](https://img.shields.io/badge/SQLite-Local-003B57?style=for-the-badge&logo=sqlite)
+![Render](https://img.shields.io/badge/Hosted_on-Render-46E3B7?style=for-the-badge&logo=render)
+![Status](https://img.shields.io/badge/Status-Portfolio_Project-success?style=for-the-badge)
 
-## 🚀 Features
-
-### 🏘️ Community-Based
-- Posts belong to **communities** (universities, apartments, offices, etc.)
-- Search and filter scoped by community
-- Promotes **local trust and relevance**
-
-### 👤 Authentication
-- Development: email/password login
-- Production: **Microsoft OAuth / Azure AD** (UI-ready, backend pending)
-- Session-based with Flask secure cookies
-
-### 🎒 Lost & Found System
-- Post items you've **found** or **lost** with:
-  - Item name, description, category, location, community
-  - Up to **3 image uploads** per post
-- Separate tabs for Found and Lost items
-- Post count badges on each tab
-
-### 🔍 Search & Filter
-- **Keyword search** across item names and descriptions
-- **Community filter** — scoped to your community
-- **Category filter** (Mobile, Laptop, Wallet, Keys, etc.)
-- **Location filter** (Library, Cafeteria, Classroom, etc.)
-- **URL persistence** — search state saved via `history.pushState()`
-- Browser back/forward navigation works with search state
-
-### 🕐 Smart Post Management
-- Post owners can **mark items as claimed/found**
-- **60-second countdown timer** before auto-deletion
-- Orphaned deletions auto-recovered on server restart
-
-### ✨ Modern Interface
-- Dark charcoal theme with subtle blue accents
-- Elevated cards with shadow depth
-- **Image lightbox** — click thumbnails to view full-size
-- **Image preview** before upload with remove buttons
-- **Relative timestamps** ("3 h ago")
-- Toast notifications with auto-dismiss
-- Loading spinner on form submission
-- Responsive design optimized for mobile
+</div>
 
 ---
 
-## ⚙️ Tech Stack
+# 📖 Overview
 
-| Component | Technology |
-|-----------|-----------|
-| **Backend** | Python 3.12, Flask 3.0 (REST API) |
-| **Frontend** | HTML5, CSS3, JavaScript (ES6) |
-| **UI Framework** | Bootstrap 5.3 |
-| **Typography** | Google Fonts (Inter) |
-| **Database** | SQLite 3 |
-| **Auth** | Werkzeug password hashing + Flask sessions |
+**Found IT** is a full-stack Lost & Found web platform that helps communities reconnect people with their belongings.
 
----
+Unlike traditional lost-and-found boards, Found IT supports two complete recovery workflows:
 
-## 📁 Project Structure
+- 📦 Claiming a found item
+- 🤝 Returning a lost item
 
-```
-Found IT/
-├── run.py                      ← Entry point: starts everything
-│
-├── backend/
-│   ├── __init__.py
-│   ├── app.py                  ← Flask REST API (routes, helpers)
-│   ├── config.py               ← Configuration (paths, constants)
-│   ├── database.py             ← Database layer (schema, queries)
-│   ├── requirements.txt        ← Python dependencies
-│   ├── instance/
-│   │   └── foundit.db          ← SQLite database (auto-created)
-│   └── uploads/                ← User-uploaded images
-│
-├── frontend/
-│   ├── index.html              ← Complete static page
-│   ├── css/
-│   │   └── style.css           ← Dark charcoal theme
-│   └── js/
-│       └── app.js              ← Fetch-based client logic
-│
-├── .gitignore
-└── README.md
-```
+The platform also includes activity tracking, request management, secure contact sharing, Google authentication, image uploads, and a production-ready PostgreSQL deployment.
 
 ---
 
-## 🛠️ Setup & Run
+# ✨ Features
 
-### Prerequisites
-- **Python 3.10+**
+## 👤 Authentication
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/pranjalranjan27/FOUND-IT.git
-cd FOUND-IT
-```
-
-### 2. Create a virtual environment
-```bash
-python -m venv .venv
-```
-
-### 3. Activate the virtual environment
-
-**Windows (PowerShell):**
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-**macOS / Linux:**
-```bash
-source .venv/bin/activate
-```
-
-### 4. Install dependencies
-```bash
-pip install -r backend/requirements.txt
-```
-
-### 5. Run the application
-```bash
-python run.py
-```
-
-### 6. Open in browser
-Navigate to **http://127.0.0.1:5000**
+- Google OAuth Login
+- Email & Password Login
+- Secure Session Management
+- Protected Dashboard
 
 ---
 
-## 🔌 API Endpoints
+## 📦 Item Management
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| `GET` | `/api/meta` | Categories, locations, communities |
-| `GET` | `/api/auth/session` | Current user info |
-| `POST` | `/api/auth/login` | Login (JSON body) |
-| `POST` | `/api/auth/register` | Register (JSON body) |
-| `POST` | `/api/auth/logout` | Logout |
-| `GET` | `/api/posts?kind=&q=&cat=&place=&community=` | List posts |
-| `POST` | `/api/posts` | Create post (FormData) |
-| `POST` | `/api/posts/<id>/delete` | Begin 60s deletion |
-| `GET` | `/uploads/<filename>` | Serve uploaded images |
-
-### Response Format
-```json
-{ "ok": true, "data": { ... } }
-{ "ok": false, "error": "Error message" }
-```
+- Post Found Items
+- Post Lost Items
+- Upload Images
+- Categories
+- Community Selection
+- Search & Filters
+- Item Details Modal
 
 ---
 
-## 🗄️ Database
+## 🔄 Recovery Workflow
 
-| Table | Purpose |
-|-------|---------|
-| `users` | Accounts (name, email, phone, community, password hash) |
-| `posts` | Lost/found items (item details, community, contact, status) |
-| `images` | Filenames linked to posts (up to 3 per post) |
+### Found Item
 
-The database is **auto-created** on the first run.
+Owners can:
 
-> The database layer is isolated in `backend/database.py`. PostgreSQL migration is a single-file change.
+- Submit ownership proof
+- Upload supporting images
+- Track request status
 
----
+Posters can:
 
-## 🔒 Security
-
-- ✅ Password hashing (Werkzeug `pbkdf2:sha256`)
-- ✅ Parameterized SQL queries (no SQL injection)
-- ✅ `secure_filename()` for uploads
-- ✅ HTML escaping in JS (`esc()` helper)
-- ✅ Ownership validation before deletion
-- ✅ 8 MB max upload size
+- Review incoming claims
+- Approve or reject claims
+- Securely share contact information
 
 ---
 
-## 🚀 Deployment
+### Lost Item
 
-| Component | Recommended Host |
-|-----------|-----------------|
-| **Frontend** (`frontend/`) | Vercel, Netlify, GitHub Pages |
-| **Backend** (`backend/` + `run.py`) | Render, Railway, Fly.io |
+Finders can:
 
----
+- Notify the owner that they have found the item
+- Describe identifying details
+- Upload supporting evidence
 
-## 🔮 Roadmap
+Posters can:
 
-- **Microsoft OAuth / Azure AD** — institutional SSO login
-- **PostgreSQL** — production database
-- Claim request workflow (request → approve → resolved)
-- Match suggestions (auto-match lost and found items)
-- User profile with post history
-- Email notifications for matching items
-- Admin moderation panel
+- Review return requests
+- Approve or reject requests
+- Connect securely with the finder
 
 ---
 
-## 🔐 Developer Note: Authentication
+## 📋 Activity System
 
-> **Current:** Temporary email/password auth for development. Old accounts cleared on startup.
->
-> **Future:** Microsoft OAuth (Azure AD). The frontend already shows "Continue with Microsoft" (disabled).
-> Backend has placeholder route stubs in `backend/app.py`.
+Every important action is logged, including:
+
+- Posted Found Item
+- Posted Lost Item
+- Claim Submitted
+- Return Request Submitted
+- Claim Approved
+- Claim Rejected
+- Contact Requested
+- Contact Shared
 
 ---
 
-## 📄 License
+## 📬 Request Management
 
-This project is for educational purposes.
+Dedicated request dashboard featuring:
+
+- Claim Requests
+- Return Requests
+- Status Tracking
+- Request History
+
+---
+
+## 🔒 Contact Privacy
+
+Phone numbers are never public.
+
+Contact details are exchanged only after:
+
+- Request approval
+- Explicit permission from the other user
+
+---
+
+## 🗄 Database
+
+Supports two database engines automatically.
+
+### Development
+
+- SQLite
+
+### Production
+
+- Supabase PostgreSQL
+
+The application automatically switches between both environments without requiring code changes.
+
+---
+
+# 🛠 Tech Stack
+
+| Category | Technology |
+|-----------|------------|
+| Backend | Flask |
+| Frontend | HTML, CSS, JavaScript |
+| Database | SQLite & PostgreSQL |
+| Authentication | Google OAuth & Local Authentication |
+| Database Layer | Custom SQL |
+| File Uploads | Flask |
+| Deployment | Render |
+| Database Hosting | Supabase |
+| Version Control | Git & GitHub |
+
+---
+
+<div align="center">
+
+### ⭐ If you found this project interesting, consider giving it a star!
+
+Built with ❤️ using Flask, PostgreSQL & Supabase
+
+</div>

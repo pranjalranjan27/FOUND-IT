@@ -443,9 +443,9 @@ html, body {
   border-left: 3px solid var(--primary);
 }
 
-.card-pending {
-  border-color: var(--amber);
-  background: linear-gradient(135deg, var(--bg-white), var(--amber-light));
+.card-closed {
+  opacity: 0.6;
+  border-color: var(--border);
 }
 
 /* ── Section headers ─────────────────────────────────────────── */
@@ -892,12 +892,10 @@ html, body {
 
 .status-active { background: var(--green-light); color: var(--green); }
 .status-active::before { background: var(--green); }
-.status-claimed { background: var(--primary-light); color: var(--primary); }
-.status-claimed::before { background: var(--primary); }
-.status-resolved { background: rgba(100,116,139,.1); color: var(--muted); }
-.status-resolved::before { background: var(--muted); }
-.status-pending_delete { background: var(--amber-light); color: #b45309; }
-.status-pending_delete::before { background: #b45309; }
+.status-claim_requested { background: var(--amber-light); color: #b45309; }
+.status-claim_requested::before { background: #b45309; }
+.status-closed { background: rgba(100,116,139,.1); color: var(--muted); }
+.status-closed::before { background: var(--muted); }
 
 .btn-status {
   font-size: .72rem;
@@ -1190,7 +1188,7 @@ hr { border-color: var(--border); opacity: .5; }
 .activity-icon-found { background: var(--green-light); color: var(--green); }
 .activity-icon-lost { background: var(--orange-light); color: var(--orange); }
 .activity-icon-status { background: var(--primary-light); color: var(--primary); }
-.activity-icon-delete { background: var(--amber-light); color: #b45309; }
+.activity-icon-delete { background: rgba(100,116,139,.1); color: var(--muted); }
 
 .activity-content { flex: 1; min-width: 0; }
 

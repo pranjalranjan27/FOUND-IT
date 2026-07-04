@@ -206,10 +206,9 @@ function refreshCustomSelects() {
 
 function renderCard(p) {
   const isOwner = state.user && p.user_id === state.user.id;
-  const isPending = p.status === "pending_delete";
 
   let cardClasses = "card";
-  if (isPending) cardClasses += " card-pending";
+  if (p.status === "closed") cardClasses += " card-closed";
   if (isOwner) cardClasses += " card-own";
 
   // Kind tag overlay
@@ -285,7 +284,6 @@ function openItemDetail(postId) {
   if (!post) return;
 
   const isOwner = state.user && post.user_id === state.user.id;
-  const isPending = post.status === "pending_delete";
   const p = post;
 
   // Hero image
@@ -321,39 +319,48 @@ function openItemDetail(postId) {
       </div>`;
   }
 
+  // Status badge
+  let statusBadge = "";
+  if (p.status === "claim_requested") {
+    statusBadge = `<span class="claim-status claim-status-pending">⏳ Claim Pending${p.claim_count > 0 ? ` (${p.claim_count})` : ''}</span>`;
+  } else if (p.status === "closed") {
+    statusBadge = `<span class="claim-status claim-status-approved">✅ Closed</span>`;
+  }
+
   // Owner actions
   let ownerHtml = "";
   if (isOwner) {
-    if (isPending) {
+    if (p.status === "closed") {
       ownerHtml = `
         <div class="detail-owner-actions">
-          <div class="d-flex align-items-center gap-2" style="color:#b45309">
-            <span class="spinner-border spinner-border-sm"></span>
-            Deleting in <span data-delete-eta="${p.delete_eta_ts || 0}"></span>&hellip;
-          </div>
+          <span class="claim-status claim-status-approved">✅ Closed</span>
         </div>`;
     } else {
-      const label = p.kind === "found" ? "Mark as Claimed" : "Mark as Found";
-      ownerHtml = `
-        <div class="detail-owner-actions">
-          <button class="btn btn-outline-danger btn-sm" onclick="handleDelete(${p.id}); bootstrap.Modal.getInstance(document.getElementById('itemDetailModal')).hide();">${label}</button>
-          <span style="font-size:.72rem;color:var(--muted)">Post will auto-delete in 60s</span>
-        </div>`;
+      let ownerBtns = '';
+      if (p.claim_count > 0) {
+        ownerBtns += `<button class="btn btn-primary btn-sm" onclick="openClaimsReview(); bootstrap.Modal.getInstance(document.getElementById('itemDetailModal')).hide();">📋 Review Claims (${p.claim_count})</button>`;
+      }
+      ownerBtns += `<button class="btn btn-outline-secondary btn-sm" onclick="handleClosePost(${p.id}); bootstrap.Modal.getInstance(document.getElementById('itemDetailModal')).hide();">Close Post</button>`;
+      ownerHtml = `<div class="detail-owner-actions">${ownerBtns}</div>`;
     }
   }
 
-  // Claim button — only for signed-in non-owners on active items
+  // Claim button — only for signed-in non-owners on non-closed items
   let claimHtml = "";
-  if (state.user && !isOwner && p.status === "active") {
+  if (state.user && !isOwner && p.status !== "closed") {
+    const btnLabel = p.kind === "found" ? "🤚 Claim This Item" : "📦 I Found Your Item";
+    const btnSubtitle = p.kind === "found"
+      ? "Submit proof that this belongs to you"
+      : "Provide proof that you found this item";
     claimHtml = `
       <div class="detail-owner-actions">
-        <button class="btn btn-primary btn-sm" onclick="openClaimModal(${p.id}, '${esc(p.item_name).replace(/'/g, "\\'")}')">🤚 Claim This Item</button>
-        <span style="font-size:.72rem;color:var(--muted)">Submit proof that this belongs to you</span>
+        <button class="btn btn-primary btn-sm" onclick="openClaimModal(${p.id}, '${esc(p.item_name).replace(/'/g, "\\'")}', '${p.kind}')">${btnLabel}</button>
+        <span style="font-size:.72rem;color:var(--muted)">${btnSubtitle}</span>
       </div>`;
-  } else if (p.status === "resolved") {
+  } else if (p.status === "closed" && !isOwner) {
     claimHtml = `
       <div class="detail-owner-actions">
-        <span class="claim-status claim-status-approved">✅ Resolved — Item has been claimed</span>
+        ${statusBadge}
       </div>`;
   }
 
@@ -362,6 +369,7 @@ function openItemDetail(postId) {
     ${thumbsHtml}
     <div class="detail-content">
       <span class="detail-kind-tag ${p.kind}">${p.kind === "found" ? "📦 Found Item" : "🔍 Lost Item"}</span>
+      ${statusBadge ? `<div style="margin-top:8px">${statusBadge}</div>` : ''}
       <h3 class="detail-title">${esc(p.item_name)}</h3>
 
       <div class="detail-grid">
@@ -395,9 +403,6 @@ function openItemDetail(postId) {
   document.getElementById("detailModalTitle").textContent = p.item_name;
 
   new bootstrap.Modal(document.getElementById("itemDetailModal")).show();
-
-  // Setup countdowns in detail modal
-  setupCountdowns();
 }
 
 /* ── Navbar rendering ────────────────────────────────────────────── */
@@ -422,9 +427,13 @@ function renderNavbar() {
             <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm15 0a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1zM3 4h10v1H3zm0 3h10v1H3zm0 3h7v1H3z"/></svg>
             My Posts
           </button>
-          <button class="user-dropdown-item" id="myClaimsBtn">
+          <button class="user-dropdown-item" id="myRequestsBtn">
             <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2zm6.5 4.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3a.5.5 0 0 1 1 0"/></svg>
-            My Claims
+            Requests
+          </button>
+          <button class="user-dropdown-item" id="myActivityBtn">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022l-.074.997M5.205.33a7 7 0 0 0-.832.28l.36.943a6 6 0 0 1 .71-.24zM3.18 1.394a7 7 0 0 0-.725.484l.58.81a6 6 0 0 1 .619-.414l-.474-.88M1.394 3.18a7 7 0 0 0-.484.725l.81.58a6 6 0 0 1 .414-.619l-.74-.686M.33 5.205a7 7 0 0 0-.28.832l.943.36a6 6 0 0 1 .24-.71l-.903-.482M.019 7.485A7 7 0 0 0 0 8a8 8 0 0 0 16 0 7 7 0 0 0-.019-.515l-.997.074A6 6 0 0 1 1.019 8.515l-.997-.074zM8 4a.5.5 0 0 1 .5.5v3.793l2.354 2.353a.5.5 0 0 1-.708.708L7.854 9.061a.5.5 0 0 1-.154-.36V4.5A.5.5 0 0 1 8 4"/></svg>
+            Activity
           </button>
           <div class="user-dropdown-divider"></div>
           <button class="user-dropdown-item text-danger" id="logoutBtn">
@@ -447,9 +456,13 @@ function renderNavbar() {
       menu.classList.remove("show");
       openMyPosts();
     });
-    document.getElementById("myClaimsBtn").addEventListener("click", () => {
+    document.getElementById("myRequestsBtn").addEventListener("click", () => {
       menu.classList.remove("show");
-      openClaimsReview();
+      openRequestsReview();
+    });
+    document.getElementById("myActivityBtn").addEventListener("click", () => {
+      menu.classList.remove("show");
+      openActivityPage();
     });
     document.getElementById("logoutBtn").addEventListener("click", handleLogout);
   } else {
@@ -529,14 +542,16 @@ function renderMyPostRow(p) {
     thumb = `<div class="my-post-thumb-placeholder">${categoryEmoji(p.category)}</div>`;
   }
 
-  const statusLabel = p.status === 'pending_delete' ? 'Deleting' : p.status;
+  const statusLabels = { 'active': 'Active', 'claim_requested': 'Claim Pending', 'closed': 'Closed' };
+  const statusLabel = statusLabels[p.status] || p.status;
   const statusBadge = `<span class="status-badge status-${esc(p.status)}">${esc(statusLabel)}</span>`;
 
   let actions = '';
-  if (p.status === 'active') {
-    actions = `<button class="btn-status" data-post-id="${p.id}" data-status-action="claimed">Mark Claimed</button>`;
-  } else if (p.status === 'claimed') {
-    actions = `<button class="btn-status" data-post-id="${p.id}" data-status-action="resolved">✓ Resolve</button>`;
+  if (p.status === 'active' || p.status === 'claim_requested') {
+    if (p.claim_count > 0) {
+      actions += `<button class="btn-status" onclick="openClaimsReview()">📋 Review (${p.claim_count})</button>`;
+    }
+    actions += `<button class="btn-status" onclick="handleClosePost(${p.id})">Close</button>`;
   }
 
   return `
@@ -566,15 +581,12 @@ function renderActivityLog(posts) {
       title: `Posted ${p.kind} item: <strong>${esc(p.item_name)}</strong>`,
       time: p.created_at,
     });
-    if (p.status === 'claimed') {
+    if (p.status === 'claim_requested') {
       entries.push({ type:'status', icon:'📩', iconClass:'activity-icon-status',
-        title:`<strong>${esc(p.item_name)}</strong> marked as claimed`, time:p.created_at });
-    } else if (p.status === 'resolved') {
+        title:`<strong>${esc(p.item_name)}</strong> has pending claims`, time:p.created_at });
+    } else if (p.status === 'closed') {
       entries.push({ type:'status', icon:'✅', iconClass:'activity-icon-status',
-        title:`<strong>${esc(p.item_name)}</strong> resolved`, time:p.created_at });
-    } else if (p.status === 'pending_delete') {
-      entries.push({ type:'delete', icon:'🗑️', iconClass:'activity-icon-delete',
-        title:`<strong>${esc(p.item_name)}</strong> deletion started`, time:p.created_at });
+        title:`<strong>${esc(p.item_name)}</strong> closed`, time:p.created_at });
     }
     return entries;
   }).flat();
@@ -732,7 +744,6 @@ async function loadPosts() {
 
   // Post-render hooks
   setupTimeago();
-  setupCountdowns();
 }
 
 /* ── Auth handlers ───────────────────────────────────────────────── */
@@ -899,20 +910,20 @@ async function handlePostSubmit(e) {
   }
 }
 
-/* ── Post deletion ───────────────────────────────────────────────── */
+/* ── Post close (owner) ──────────────────────────────────────────── */
 
-async function handleDelete(postId) {
-  if (!confirm("Are you sure? The post will be deleted in 60 seconds.")) return;
+async function handleClosePost(postId) {
+  if (!confirm("Close this post? All pending claims will be rejected.")) return;
 
-  const res = await api(`/api/posts/${postId}/delete`, { method: "POST" });
+  const res = await api(`/api/posts/${postId}/close`, { method: "POST" });
   if (res.ok) {
-    showToast("Deletion started. Post will be removed in 60 seconds.", "warning");
+    showToast("Post closed successfully.", "success");
     loadPosts();
   } else {
-    showToast(res.error || "Could not delete.", "error");
+    showToast(res.error || "Could not close post.", "error");
   }
 }
-window.handleDelete = handleDelete;
+window.handleClosePost = handleClosePost;
 
 /* ── Search & filters ────────────────────────────────────────────── */
 
@@ -991,22 +1002,6 @@ function setupFilters() {
   });
 }
 
-/* ── Delete countdown timers ─────────────────────────────────────── */
-
-function setupCountdowns() {
-  document.querySelectorAll("[data-delete-eta]").forEach((el) => {
-    const eta = parseInt(el.getAttribute("data-delete-eta"), 10);
-    if (!eta) return;
-    function tick() {
-      const now = Math.floor(Date.now() / 1000);
-      const remain = Math.max(0, eta - now);
-      el.textContent = remain + "s";
-      if (remain > 0) setTimeout(tick, 1000);
-      else loadPosts();
-    }
-    tick();
-  });
-}
 
 /* ── Relative timestamps ─────────────────────────────────────────── */
 
@@ -1098,7 +1093,7 @@ function setupMobileFab() {
 
 /* ── Claim workflow ──────────────────────────────────────────────── */
 
-function openClaimModal(postId, itemName) {
+function openClaimModal(postId, itemName, postKind) {
   // Close the detail modal first
   const detailModal = bootstrap.Modal.getInstance(document.getElementById('itemDetailModal'));
   if (detailModal) detailModal.hide();
@@ -1106,6 +1101,26 @@ function openClaimModal(postId, itemName) {
   document.getElementById('claimPostId').value = postId;
   document.getElementById('claimItemName').textContent = itemName;
   document.getElementById('claimForm').reset();
+
+  // Set dynamic title, prompt, placeholder, and proof label based on post kind
+  const titleEl = document.getElementById('claimModalTitle');
+  const promptEl = document.getElementById('claimPromptLabel');
+  const messageEl = document.getElementById('claimMessage');
+  const proofLabel = document.getElementById('claimProofLabel');
+  const proofHint = document.getElementById('claimProofHint');
+  if (postKind === 'lost') {
+    if (titleEl) titleEl.textContent = 'I Have Your Item';
+    if (promptEl) promptEl.textContent = 'Describe the item';
+    if (messageEl) messageEl.placeholder = 'Describe identifying features and where/how you found the item...';
+    if (proofLabel) proofLabel.textContent = 'Supporting files (photos of the item, up to 3)';
+    if (proofHint) proofHint.textContent = 'e.g. photos of the item, location where found';
+  } else {
+    if (titleEl) titleEl.textContent = 'Claim This Item';
+    if (promptEl) promptEl.textContent = 'Why does this item belong to you?';
+    if (messageEl) messageEl.placeholder = 'Describe identifying features, when/where you lost it, or any proof of ownership\u2026';
+    if (proofLabel) proofLabel.textContent = 'Proof files (images or PDF, up to 3)';
+    if (proofHint) proofHint.textContent = 'e.g. purchase receipt, warranty card, ownership photos';
+  }
 
   // Pre-fill with user info
   if (state.user) {
@@ -1154,90 +1169,166 @@ async function handleClaimSubmit(e) {
   }
 }
 
-async function openClaimsReview() {
-  const bodyEl = document.getElementById('claimsReviewBody');
-  bodyEl.innerHTML = '<div class="text-center p-4"><span class="spinner-border spinner-border-sm"></span> Loading…</div>';
+async function openRequestsReview() {
+  const claimList = document.getElementById('reqClaimList');
+  const returnList = document.getElementById('reqReturnList');
+  claimList.innerHTML = '<div class="text-center p-4"><span class="spinner-border spinner-border-sm"></span> Loading…</div>';
+  returnList.innerHTML = '';
 
-  new bootstrap.Modal(document.getElementById('claimsReviewModal')).show();
+  new bootstrap.Modal(document.getElementById('requestsReviewModal')).show();
 
   const res = await api('/api/claims/mine');
   if (!res.ok) {
-    bodyEl.innerHTML = '<div class="my-posts-empty"><p>Could not load claims.</p></div>';
+    claimList.innerHTML = '<div class="my-posts-empty"><p>Could not load requests.</p></div>';
     return;
   }
 
   const claims = res.data.claims;
-  if (!claims.length) {
-    bodyEl.innerHTML = `
-      <div class="my-posts-empty">
-        <div class="empty-icon">📫</div>
-        <h5>No claims yet</h5>
-        <p>When someone submits a claim on one of your posts, it will appear here.</p>
+  const claimReqs = claims.filter(c => (c.request_type || 'claim') === 'claim');
+  const returnReqs = claims.filter(c => c.request_type === 'return');
+
+  claimList.innerHTML = claimReqs.length
+    ? claimReqs.map(c => renderRequestCard(c)).join('')
+    : `<div class="my-posts-empty"><div class="empty-icon">📫</div><h5>No claim requests</h5><p>When someone claims your found item, it will appear here.</p></div>`;
+
+  returnList.innerHTML = returnReqs.length
+    ? returnReqs.map(c => renderRequestCard(c)).join('')
+    : `<div class="my-posts-empty"><div class="empty-icon">📫</div><h5>No return requests</h5><p>When someone says they have your lost item, it will appear here.</p></div>`;
+}
+// Keep backward compat — old inline onclicks may reference openClaimsReview
+function openClaimsReview() { openRequestsReview(); }
+
+function renderRequestCard(c) {
+  const proofHtml = c.files.length ? `
+    <div class="claim-proof-row">
+      ${c.files.map(f => {
+        const isPdf = f.original_name && f.original_name.toLowerCase().endsWith('.pdf');
+        const icon = isPdf
+          ? '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5z"/></svg>'
+          : '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/><path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1z"/></svg>';
+        return `<a href="/uploads/${esc(f.filename)}" target="_blank" class="claim-proof-item">${icon} ${esc(f.original_name || f.filename)}</a>`;
+      }).join('')}
+    </div>` : '';
+
+  const typeLabel = (c.request_type || 'claim') === 'return' ? 'Return Request' : 'Claim Request';
+
+  let actionsHtml = '';
+  if (c.status === 'pending') {
+    actionsHtml = `
+      <div class="claim-actions">
+        <button class="btn btn-primary btn-sm" onclick="handleClaimAction(${c.id}, 'approve')">Approve</button>
+        <button class="btn btn-outline-danger btn-sm" onclick="handleClaimAction(${c.id}, 'reject')">Reject</button>
       </div>`;
-    return;
   }
 
-  bodyEl.innerHTML = claims.map(c => {
-    const proofHtml = c.files.length ? `
-      <div class="claim-proof-row">
-        ${c.files.map(f => {
-          const isPdf = f.original_name && f.original_name.toLowerCase().endsWith('.pdf');
-          const icon = isPdf
-            ? '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5z"/></svg>'
-            : '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/><path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1z"/></svg>';
-          return `<a href="/uploads/${esc(f.filename)}" target="_blank" class="claim-proof-item">${icon} ${esc(f.original_name || f.filename)}</a>`;
-        }).join('')}
-      </div>` : '';
-
-    let actionsHtml = '';
-    if (c.status === 'pending') {
-      actionsHtml = `
-        <div class="claim-actions">
-          <button class="btn btn-primary btn-sm" onclick="handleClaimAction(${c.id}, 'approve')">Approve</button>
-          <button class="btn btn-outline-danger btn-sm" onclick="handleClaimAction(${c.id}, 'reject')">Reject</button>
-        </div>`;
-    }
-
-    return `
-      <div class="claim-card">
-        <div class="claim-card-header">
-          <div>
-            <div class="claim-card-item">${categoryEmoji(c.item_category)} ${esc(c.item_name)}</div>
-            <div class="claim-card-time">${timeAgo(c.created_at)}</div>
-          </div>
-          <span class="claim-status claim-status-${esc(c.status)}">${esc(c.status)}</span>
+  return `
+    <div class="claim-card">
+      <div class="claim-card-header">
+        <div>
+          <div class="claim-card-item">${categoryEmoji(c.item_category)} ${esc(c.item_name)}</div>
+          <div class="claim-card-time">${typeLabel} · ${timeAgo(c.created_at)}</div>
         </div>
-        <div class="claim-info-row">
-          <span><strong>From:</strong> ${esc(c.claimant_name)}</span>
-          <span><strong>Email:</strong> ${esc(c.claimant_email)}</span>
-          ${c.claimant_phone ? `<span><strong>Phone:</strong> ${esc(c.claimant_phone)}</span>` : ''}
-        </div>
-        ${c.message ? `<div class="claim-message">${esc(c.message)}</div>` : ''}
-        ${proofHtml}
-        ${actionsHtml}
-      </div>`;
-  }).join('');
+        <span class="claim-status claim-status-${esc(c.status)}">${esc(c.status)}</span>
+      </div>
+      <div class="claim-info-row">
+        <span><strong>From:</strong> ${esc(c.claimant_name)}</span>
+        <span><strong>Email:</strong> ${esc(c.claimant_email)}</span>
+        ${c.claimant_phone ? `<span><strong>Phone:</strong> ${esc(c.claimant_phone)}</span>` : ''}
+      </div>
+      ${c.message ? `<div class="claim-message">${esc(c.message)}</div>` : ''}
+      ${proofHtml}
+      ${actionsHtml}
+    </div>`;
 }
 
 async function handleClaimAction(claimId, action) {
   const confirmMsg = action === 'approve'
-    ? 'Approve this claim? The item will be marked as resolved.'
-    : 'Reject this claim?';
+    ? 'Approve this request? The post will be closed and all other pending requests will be rejected.'
+    : 'Reject this request?';
   if (!confirm(confirmMsg)) return;
 
   const res = await api(`/api/claims/${claimId}/${action}`, { method: 'POST' });
   if (res.ok) {
     const msg = action === 'approve'
-      ? 'Claim approved! Item marked as resolved.'
-      : 'Claim rejected.';
+      ? 'Request approved! Post closed.'
+      : 'Request rejected.';
     showToast(msg, 'success');
-    openClaimsReview();
+    openRequestsReview();
     loadPosts();
   } else {
-    showToast(res.error || `Could not ${action} claim.`, 'error');
+    showToast(res.error || `Could not ${action} request.`, 'error');
   }
 }
 window.handleClaimAction = handleClaimAction;
+
+/* ── Activity page ──────────────────────────────────────────────── */
+
+const activityIcons = {
+  claim_submitted: '📩',
+  claim_received: '📬',
+  claim_approved: '✅',
+  claim_approved_claimant: '✅',
+  claim_rejected: '❌',
+  claim_rejected_claimant: '❌',
+  return_submitted: '📦',
+  return_received: '📬',
+  return_approved: '✅',
+  return_approved_claimant: '✅',
+  return_rejected: '❌',
+  return_rejected_claimant: '❌',
+  item_created_found: '📦',
+  item_created_lost: '🔍',
+  contact_requested: '📞',
+  contact_received: '📞',
+  contact_shared: '📱',
+  contact_shared_to: '📱',
+};
+
+async function openActivityPage(filter) {
+  const bodyEl = document.getElementById('activityFeedBody');
+  const filterEl = document.getElementById('activityFilter');
+  bodyEl.innerHTML = '<div class="text-center p-4"><span class="spinner-border spinner-border-sm"></span> Loading…</div>';
+
+  const modal = bootstrap.Modal.getInstance(document.getElementById('activityModal'))
+    || new bootstrap.Modal(document.getElementById('activityModal'));
+  modal.show();
+
+  const filt = filter || filterEl.value || 'all';
+  filterEl.value = filt;
+
+  const res = await api(`/api/activity?filter=${encodeURIComponent(filt)}`);
+  if (!res.ok) {
+    bodyEl.innerHTML = '<div class="my-posts-empty"><p>Could not load activity.</p></div>';
+    return;
+  }
+
+  const activities = res.data.activities;
+  if (!activities.length) {
+    bodyEl.innerHTML = `
+      <div class="my-posts-empty">
+        <div class="empty-icon">💭</div>
+        <h5>No activity yet</h5>
+        <p>Your activity timeline will appear here as you use Found IT.</p>
+      </div>`;
+    return;
+  }
+
+  bodyEl.innerHTML = activities.map(a => {
+    const icon = activityIcons[a.event_type] || '📌';
+    return `
+      <div class="activity-row">
+        <div class="activity-icon activity-icon-status">${icon}</div>
+        <div class="activity-content">
+          <div class="activity-title">${a.message}</div>
+          <div class="activity-time">${timeAgo(a.created_at)}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Attach filter change
+  filterEl.onchange = () => openActivityPage(filterEl.value);
+}
+window.openActivityPage = openActivityPage;
 
 /* ── Bootstrap everything on DOM ready ───────────────────────────── */
 
