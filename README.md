@@ -13,7 +13,6 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-336791?style=for-the-badge&logo=postgresql)
 ![SQLite](https://img.shields.io/badge/SQLite-Local-003B57?style=for-the-badge&logo=sqlite)
 ![Render](https://img.shields.io/badge/Hosted_on-Render-46E3B7?style=for-the-badge&logo=render)
-![Status](https://img.shields.io/badge/Status-Portfolio_Project-success?style=for-the-badge)
 
 </div>
 
