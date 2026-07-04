@@ -115,17 +115,6 @@ Dedicated request dashboard featuring:
 
 ---
 
-## 🔒 Contact Privacy
-
-Phone numbers are never public.
-
-Contact details are exchanged only after:
-
-- Request approval
-- Explicit permission from the other user
-
----
-
 ## 🗄 Database
 
 Supports two database engines automatically.
